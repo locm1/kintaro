@@ -1,0 +1,29 @@
+{
+  "name": "勤怠太郎",
+  "short_name": "勤怠太郎",
+  "description": "LINE勤怠管理システム",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "line_mini_app": {
+    "version": "1.0.0",
+    "type": "full",
+    "permissions": [
+      "profile",
+      "openid"
+    ]
+  }
+}
