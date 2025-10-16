@@ -118,20 +118,23 @@ export async function GET(request: NextRequest) {
     }
 
     // ユーザーが管理者かチェック
-    const { data: userCompany } = await supabase
+    const { data: userCompanies } = await supabase
       .from('user_companies')
       .select('is_admin')
       .eq('user_id', userId)
       .eq('company_id', companyId)
-      .single()
+    
+    const userCompany = userCompanies?.[0]
 
     let query = supabase
       .from('attendance_records')
       .select(`
         *,
-        user_companies!inner(
-          user_id,
-          users:user_id(email)
+        users!inner(
+          id,
+          line_user_id,
+          email,
+          name
         )
       `)
       .eq('company_id', companyId)

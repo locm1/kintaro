@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { initLineMiniApp, getLineMiniAppProfile, isLineMiniAppAvailable, createMockLineMiniApp } from '@/lib/liff'
 import { Clock, Coffee, FileText, Users, Edit3 } from 'lucide-react'
 import { clsx } from 'clsx'
+import { useAuth } from '@/components/AuthProvider'
 
 interface User {
   id: string
@@ -31,14 +31,16 @@ interface AttendanceRecord {
 }
 
 export default function AttendancePage() {
-  const [isLineMiniAppReady, setIsLineMiniAppReady] = useState(false)
-  const [userProfile, setUserProfile] = useState<any>(null)
+  const { isAuthenticated, userProfile, isLoading: authLoading } = useAuth()
   const [user, setUser] = useState<User | null>(null)
-  const [records, setRecords] = useState<AttendanceRecord[]>([])
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([])
+  const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState('')
-  const [showRecords, setShowRecords] = useState(false)
+  const [showAdmin, setShowAdmin] = useState(false)
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null)
+  const [users, setUsers] = useState<User[]>([])
+  const [showRecords, setShowRecords] = useState(false)
   const [editForm, setEditForm] = useState({
     clockIn: '',
     clockOut: '',
@@ -47,36 +49,28 @@ export default function AttendancePage() {
   })
 
   useEffect(() => {
-    const initializeLineMiniApp = async () => {
-      // 開発環境でのモック作成
-      if (process.env.NODE_ENV === 'development' && !isLineMiniAppAvailable()) {
-        createMockLineMiniApp()
-      }
-      
-      const success = await initLineMiniApp()
-      if (success) {
-        setIsLineMiniAppReady(true)
-        const profile = await getLineMiniAppProfile()
-        setUserProfile(profile)
-        
-        if (profile?.userId) {
-          await loadUser(profile.userId)
-        }
-
-        // URL パラメータから自動実行するアクションをチェック
-        const urlParams = new URLSearchParams(window.location.search)
-        const action = urlParams.get('action')
-        if (action && (action === 'clock_in' || action === 'clock_out')) {
-          // 少し遅延を入れてユーザー情報の読み込み完了を待つ
-          setTimeout(() => {
-            handleAttendanceAction(action)
-          }, 1000)
-        }
-      }
+    // 認証は AuthProvider で処理済み
+    if (userProfile?.userId) {
+      loadUserAndRecords(userProfile.userId)
     }
+  }, [userProfile])
 
-    initializeLineMiniApp()
-  }, [])
+  const loadUserAndRecords = async (lineUserId: string) => {
+    try {
+      const response = await fetch(`/api/users?lineUserId=${lineUserId}`)
+      const data = await response.json()
+      
+      if (data.user) {
+        setUser(data.user)
+        await loadRecords(data.user.id, data.user.companyId)
+      } else {
+        setMessage('会社との連携が必要です')
+      }
+    } catch (error) {
+      console.error('Error loading user:', error)
+      setMessage('ユーザー情報の取得に失敗しました')
+    }
+  }
 
   const loadUser = async (lineUserId: string) => {
     try {
@@ -99,7 +93,7 @@ export default function AttendancePage() {
     try {
       const response = await fetch(`/api/attendance?userId=${userId}&companyId=${companyId}`)
       const data = await response.json()
-      setRecords(data.records || [])
+      setAttendanceRecords(data.records || [])
     } catch (error) {
       console.error('Error loading records:', error)
     }
@@ -202,15 +196,26 @@ export default function AttendancePage() {
 
   const getTodayRecord = () => {
     const today = new Date().toISOString().split('T')[0]
-    return records.find(record => record.date === today)
+    return attendanceRecords.find((record: AttendanceRecord) => record.date === today)
   }
 
-  if (!isLineMiniAppReady) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">LINE Mini App 初期化中...</p>
+          <p className="text-gray-600">初期化中...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">LINEログイン中...</p>
         </div>
       </div>
     )
@@ -232,7 +237,7 @@ export default function AttendancePage() {
     )
   }
 
-  const todayRecord = getTodayRecord()
+  const currentRecord = getTodayRecord()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -279,25 +284,27 @@ export default function AttendancePage() {
           </div>
         )}
 
-        {todayRecord && (
-          <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-            <h3 className="font-semibold text-gray-800 mb-3">今日の勤怠</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-600">出勤:</span>
-                <span className="ml-2 font-semibold">{formatTime(todayRecord.clock_in)}</span>
+        {currentRecord && (
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 mb-6 border border-blue-200/50">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-semibold text-gray-800">今日の勤怠状況</h3>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">出勤時刻:</span>
+                <span className="ml-2 font-semibold">{formatTime(currentRecord?.clock_in)}</span>
               </div>
-              <div>
-                <span className="text-gray-600">退勤:</span>
-                <span className="ml-2 font-semibold">{formatTime(todayRecord.clock_out)}</span>
+              <div className="flex justify-between">
+                <span className="text-gray-600">退勤時刻:</span>
+                <span className="ml-2 font-semibold">{formatTime(currentRecord?.clock_out)}</span>
               </div>
-              <div>
+              <div className="flex justify-between">
                 <span className="text-gray-600">休憩開始:</span>
-                <span className="ml-2 font-semibold">{formatTime(todayRecord.break_start)}</span>
+                <span className="ml-2 font-semibold">{formatTime(currentRecord?.break_start)}</span>
               </div>
-              <div>
+              <div className="flex justify-between">
                 <span className="text-gray-600">休憩終了:</span>
-                <span className="ml-2 font-semibold">{formatTime(todayRecord.break_end)}</span>
+                <span className="ml-2 font-semibold">{formatTime(currentRecord?.break_end)}</span>
               </div>
             </div>
           </div>
@@ -309,7 +316,7 @@ export default function AttendancePage() {
             disabled={isLoading}
             className={clsx(
               "p-4 rounded-lg font-semibold transition",
-              todayRecord?.clock_in
+              currentRecord?.clock_in
                 ? "bg-gray-100 text-gray-500 cursor-not-allowed"
                 : "bg-green-500 text-white hover:bg-green-600"
             )}
@@ -320,10 +327,10 @@ export default function AttendancePage() {
 
           <button
             onClick={() => handleAttendanceAction('clock_out')}
-            disabled={isLoading || !todayRecord?.clock_in || Boolean(todayRecord?.clock_out)}
+            disabled={isLoading || !currentRecord?.clock_in || Boolean(currentRecord?.clock_out)}
             className={clsx(
               "p-4 rounded-lg font-semibold transition",
-              (!todayRecord?.clock_in || todayRecord?.clock_out)
+              (!currentRecord?.clock_in || currentRecord?.clock_out)
                 ? "bg-gray-100 text-gray-500 cursor-not-allowed"
                 : "bg-red-500 text-white hover:bg-red-600"
             )}
@@ -334,10 +341,10 @@ export default function AttendancePage() {
 
           <button
             onClick={() => handleAttendanceAction('break_start')}
-            disabled={isLoading || !todayRecord?.clock_in || Boolean(todayRecord?.break_start && !todayRecord?.break_end)}
+            disabled={isLoading || !currentRecord?.clock_in || Boolean(currentRecord?.break_start && !currentRecord?.break_end)}
             className={clsx(
               "p-4 rounded-lg font-semibold transition",
-              (!todayRecord?.clock_in || (todayRecord?.break_start && !todayRecord?.break_end))
+              (!currentRecord?.clock_in || (currentRecord?.break_start && !currentRecord?.break_end))
                 ? "bg-gray-100 text-gray-500 cursor-not-allowed"
                 : "bg-yellow-500 text-white hover:bg-yellow-600"
             )}
@@ -348,7 +355,7 @@ export default function AttendancePage() {
 
           <button
             onClick={() => handleAttendanceAction('break_end')}
-            disabled={isLoading || !todayRecord?.break_start || Boolean(todayRecord?.break_end)}
+            disabled={isLoading || !currentRecord?.break_start || Boolean(currentRecord?.break_end)}
             className={clsx(
               "p-4 rounded-lg font-semibold transition",
               (!todayRecord?.break_start || todayRecord?.break_end)
@@ -388,10 +395,10 @@ export default function AttendancePage() {
           <div className="mt-6 bg-white rounded-lg shadow-md p-4">
             <h3 className="font-semibold text-gray-800 mb-4">勤怠履歴</h3>
             <div className="space-y-3">
-              {records.length === 0 ? (
+              {attendanceRecords.length === 0 ? (
                 <p className="text-gray-500 text-center py-4">履歴がありません</p>
               ) : (
-                records.map((record) => (
+                attendanceRecords.map((record) => (
                   <div key={record.id} className="border rounded-lg p-3">
                     <div className="flex justify-between items-start mb-2">
                       <div>

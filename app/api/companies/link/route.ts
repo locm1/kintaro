@@ -3,36 +3,57 @@ import { supabase } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, companyCode, lineUserId } = await request.json()
+    const { companyCode, lineUserId } = await request.json()
 
     // 会社コードで会社を検索
-    const { data: company, error: companyError } = await supabase
+    const { data: companies, error: companyError } = await supabase
       .from('companies')
       .select('*')
       .eq('code', companyCode)
-      .single()
 
-    if (companyError || !company) {
+    if (companyError) {
+      console.error('Company fetch error:', companyError)
+      return NextResponse.json({ error: 'データベースエラー' }, { status: 500 })
+    }
+
+    if (!companies || companies.length === 0) {
       return NextResponse.json({ error: '会社コードが見つかりません' }, { status: 404 })
     }
 
+    const company = companies[0]
+
     // すでに連携済みかチェック
-    const { data: existingAssociation } = await supabase
+    const { data: existingAssociations } = await supabase
       .from('user_companies')
       .select('*')
-      .eq('user_id', userId)
+      .eq('line_user_id', lineUserId)
       .eq('company_id', company.id)
+
+    if (existingAssociations && existingAssociations.length > 0) {
+      return NextResponse.json({ error: 'すでに連携済みです' }, { status: 400 })
+    }
+
+    // usersテーブルにユーザーを作成
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .insert({
+        line_user_id: lineUserId,
+        company_id: company.id,
+        is_admin: false
+      })
+      .select()
       .single()
 
-    if (existingAssociation) {
-      return NextResponse.json({ error: 'すでに連携済みです' }, { status: 400 })
+    if (userError) {
+      console.error('User creation error:', userError)
+      return NextResponse.json({ error: 'ユーザー作成に失敗しました' }, { status: 500 })
     }
 
     // ユーザーと会社を連携
     const { error: associationError } = await supabase
       .from('user_companies')
       .insert({
-        user_id: userId,
+        user_id: user.id,
         company_id: company.id,
         is_admin: false,
         line_user_id: lineUserId

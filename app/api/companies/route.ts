@@ -3,18 +3,17 @@ import { supabase } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, adminUserId, lineUserId } = await request.json()
+    const { name, lineUserId } = await request.json()
 
     // 会社コードを生成（簡単な実装）
     const code = Math.random().toString(36).substring(2, 10).toUpperCase()
 
-    // 会社を登録
+    // 会社を登録（admin_idは後で設定）
     const { data: company, error: companyError } = await supabase
       .from('companies')
       .insert({
         name,
-        code,
-        admin_id: adminUserId
+        code
       })
       .select()
       .single()
@@ -24,11 +23,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create company' }, { status: 500 })
     }
 
+    // usersテーブルに管理者ユーザーを作成
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .insert({
+        line_user_id: lineUserId,
+        company_id: company.id,
+        is_admin: true
+      })
+      .select()
+      .single()
+
+    if (userError) {
+      console.error('User creation error:', userError)
+      return NextResponse.json({ error: 'Failed to create admin user' }, { status: 500 })
+    }
+
     // ユーザーと会社の関連付け（管理者として）
     const { error: userCompanyError } = await supabase
       .from('user_companies')
       .insert({
-        user_id: adminUserId,
+        user_id: user.id,
         company_id: company.id,
         is_admin: true,
         line_user_id: lineUserId

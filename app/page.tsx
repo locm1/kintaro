@@ -1,18 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { Building2, Users, Clock } from 'lucide-react'
 import Link from 'next/link'
+import { useAuth } from '@/components/AuthProvider'
 
 export default function Home() {
-  const [isLineMiniAppAvailable, setIsLineMiniAppAvailable] = useState(false)
-
-  useEffect(() => {
-    // LINE Mini Appが利用可能かどうかをチェック
-    if (typeof window !== 'undefined') {
-      setIsLineMiniAppAvailable(!!(window as any).lineMiniApp)
-    }
-  }, [])
+  const { userProfile } = useAuth()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -54,12 +47,19 @@ export default function Home() {
             </Link>
           </div>
 
-          {!isLineMiniAppAvailable && (
-            <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
-              <p className="text-sm">
-                <strong>注意:</strong> この画面はLINE Mini Appとして動作します。
-                LINE公式アカウント「勤怠太郎」からアクセスしてください。
-              </p>
+          {userProfile && (
+            <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+              <div className="flex items-center space-x-3">
+                <img 
+                  src={userProfile.pictureUrl || 'https://via.placeholder.com/50'} 
+                  alt="Profile" 
+                  className="w-12 h-12 rounded-full"
+                />
+                <div>
+                  <p className="font-semibold text-gray-800">{userProfile.displayName}</p>
+                  <p className="text-sm text-gray-600">LINEユーザー</p>
+                </div>
+              </div>
             </div>
           )}
 

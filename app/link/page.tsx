@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { initLineMiniApp, getLineMiniAppProfile, isLineMiniAppAvailable, createMockLineMiniApp } from '@/lib/liff'
 import { supabase } from '@/lib/supabase'
 import { Building2, Users, ShieldCheck } from 'lucide-react'
+import { useAuth } from '@/components/AuthProvider'
 
 interface Company {
   id: string
@@ -12,8 +12,7 @@ interface Company {
 }
 
 export default function CompanyLinkPage() {
-  const [isLineMiniAppReady, setIsLineMiniAppReady] = useState(false)
-  const [userProfile, setUserProfile] = useState<any>(null)
+  const { userProfile } = useAuth()
   const [companies, setCompanies] = useState<Company[]>([])
   const [selectedCompany, setSelectedCompany] = useState('')
   const [companyCode, setCompanyCode] = useState('')
@@ -24,47 +23,35 @@ export default function CompanyLinkPage() {
   const [userId, setUserId] = useState('')
 
   useEffect(() => {
-    const initializeLineMiniApp = async () => {
-      // 開発環境でのモック作成
-      if (process.env.NODE_ENV === 'development' && !isLineMiniAppAvailable()) {
-        createMockLineMiniApp()
-      }
-      
-      const success = await initLineMiniApp()
-      if (success) {
-        setIsLineMiniAppReady(true)
-        const profile = await getLineMiniAppProfile()
-        setUserProfile(profile)
+    // 認証は AuthProvider で処理済み
+    // userProfile が利用可能になったら初期化処理を実行
+    if (userProfile) {
+      handleUserProfile()
+    }
+  }, [userProfile])
+
+  const handleUserProfile = async () => {
+    const lineUserId = userProfile?.userId
+    if (lineUserId) {
+      try {
+        // 既存ユーザーをチェック
+        const response = await fetch(`/api/users?lineUserId=${lineUserId}`)
+        const data = await response.json()
         
-        // SupabaseでユーザーIDを生成または取得
-        const lineUserId = profile?.userId
-        if (lineUserId) {
-          // 既存ユーザーをチェック
-          const response = await fetch(`/api/users?lineUserId=${lineUserId}`)
-          const data = await response.json()
-          
-          if (data.user) {
-            setMessage('すでに会社と連携済みです')
-            return
-          }
-          
-          // 新規ユーザーの場合、Supabase Authでユーザーを作成
-          const { data: authData, error } = await supabase.auth.signUp({
-            email: `${lineUserId}@line.local`,
-            password: Math.random().toString(36),
-          })
-          
-          if (authData.user) {
-            setUserId(authData.user.id)
-          }
+        if (data.user) {
+          setMessage('すでに会社と連携済みです')
+        } else {
+          // 新規ユーザーの場合、LINEユーザーIDを使用
+          // UUIDは会社連携時に生成される
+          setUserId(lineUserId) 
         }
-        
-        loadCompanies()
+      } catch (error) {
+        console.error('Error handling user profile:', error)
       }
     }
-
-    initializeLineMiniApp()
-  }, [])
+    
+    loadCompanies()
+  }
 
   const loadCompanies = async () => {
     try {
@@ -90,7 +77,6 @@ export default function CompanyLinkPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: userId,
           companyCode: companyCode.trim().toUpperCase(),
           lineUserId: userProfile?.userId
         }),
@@ -126,7 +112,6 @@ export default function CompanyLinkPage() {
         },
         body: JSON.stringify({
           name: newCompanyName.trim(),
-          adminUserId: userId,
           lineUserId: userProfile?.userId
         }),
       })
@@ -148,16 +133,7 @@ export default function CompanyLinkPage() {
     }
   }
 
-  if (!isLineMiniAppReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">LINE Mini App 初期化中...</p>
-        </div>
-      </div>
-    )
-  }
+  // 認証は AuthProvider で処理されるため、ここでは初期化画面は不要
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -172,25 +148,57 @@ export default function CompanyLinkPage() {
 
         {userProfile && (
           <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-            <div className="flex items-center space-x-3">
-              <img 
-                src={userProfile.pictureUrl} 
-                alt="Profile" 
-                className="w-12 h-12 rounded-full"
-              />
-              <div>
-                <p className="font-semibold">{userProfile.displayName}</p>
-                <p className="text-sm text-gray-600">ようこそ！</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <img 
+                  src={userProfile.pictureUrl || 'https://via.placeholder.com/50'} 
+                  alt="Profile" 
+                  className="w-12 h-12 rounded-full"
+                />
+                <div>
+                  <p className="font-semibold">{userProfile.displayName}</p>
+                  <p className="text-sm text-gray-600">ようこそ！</p>
+                </div>
               </div>
+              {process.env.NODE_ENV === 'development' && (
+                <button
+                  onClick={() => {
+                    console.log('Current auth state:', {
+                      userProfile,
+                      localStorage: {
+                        profile: localStorage.getItem('line_auth_profile'),
+                        token: localStorage.getItem('line_auth_token'),
+                        timestamp: localStorage.getItem('line_auth_timestamp')
+                      }
+                    })
+                  }}
+                  className="text-xs bg-gray-200 px-2 py-1 rounded"
+                >
+                  Debug
+                </button>
+              )}
             </div>
           </div>
         )}
 
         {message && (
-          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+          <div className={`px-4 py-3 rounded mb-4 ${
+            message.includes('ログイン') || message.includes('必要') 
+              ? 'bg-yellow-100 border border-yellow-400 text-yellow-700'
+              : message.includes('処理中')
+              ? 'bg-blue-100 border border-blue-400 text-blue-700'
+              : 'bg-green-100 border border-green-400 text-green-700'
+          }`}>
+            {message.includes('処理中') && (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+              </div>
+            )}
             {message}
           </div>
         )}
+
+        {/* ログインフォームはAuthProviderで処理されるため削除 */}
 
         {!showAdminForm ? (
           <div className="space-y-6">

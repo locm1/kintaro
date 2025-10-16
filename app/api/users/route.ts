@@ -11,20 +11,27 @@ export async function GET(request: NextRequest) {
     }
 
     // LINEユーザーIDから関連付けされたユーザー情報を取得
-    const { data: userCompany, error } = await supabase
+    const { data: userCompanies, error } = await supabase
       .from('user_companies')
       .select(`
         *,
         companies(*)
       `)
       .eq('line_user_id', lineUserId)
-      .single()
 
     if (error) {
       console.error('Error fetching user:', error)
+      return NextResponse.json({ error: 'Database error' }, { status: 500 })
+    }
+
+    // ユーザーが存在しない場合
+    if (!userCompanies || userCompanies.length === 0) {
       return NextResponse.json({ user: null })
     }
 
+    // 最初の会社情報を返す（複数の会社に所属している場合は最初のもの）
+    const userCompany = userCompanies[0]
+    
     return NextResponse.json({ 
       user: {
         id: userCompany.user_id,
