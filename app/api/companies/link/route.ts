@@ -37,9 +37,7 @@ export async function POST(request: NextRequest) {
     const { data: user, error: userError } = await supabase
       .from('users')
       .insert({
-        line_user_id: lineUserId,
-        company_id: company.id,
-        is_admin: false
+        line_user_id: lineUserId
       })
       .select()
       .single()
@@ -55,8 +53,7 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: user.id,
         company_id: company.id,
-        is_admin: false,
-        line_user_id: lineUserId
+        is_admin: false
       })
 
     if (associationError) {

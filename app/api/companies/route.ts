@@ -27,9 +27,7 @@ export async function POST(request: NextRequest) {
     const { data: user, error: userError } = await supabase
       .from('users')
       .insert({
-        line_user_id: lineUserId,
-        company_id: company.id,
-        is_admin: true
+        line_user_id: lineUserId
       })
       .select()
       .single()
@@ -45,13 +43,23 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: user.id,
         company_id: company.id,
-        is_admin: true,
-        line_user_id: lineUserId
+        is_admin: true
       })
 
     if (userCompanyError) {
       console.error('User company association error:', userCompanyError)
       return NextResponse.json({ error: 'Failed to associate user with company' }, { status: 500 })
+    }
+
+    // 会社のadmin_idを更新
+    const { error: updateCompanyError } = await supabase
+      .from('companies')
+      .update({ admin_id: user.id })
+      .eq('id', company.id)
+
+    if (updateCompanyError) {
+      console.error('Company admin update error:', updateCompanyError)
+      // エラーでもレスポンスは返す（非致命的）
     }
 
     return NextResponse.json({ 
