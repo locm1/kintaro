@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(request: NextRequest) {
   try {
     const { companyCode, lineUserId } = await request.json()
 
     // 会社コードで会社を検索
-    const { data: companies, error: companyError } = await supabase
+    const { data: companies, error: companyError } = await supabaseAdmin
       .from('companies')
       .select('*')
       .eq('code', companyCode)
@@ -22,33 +23,49 @@ export async function POST(request: NextRequest) {
 
     const company = companies[0]
 
-    // すでに連携済みかチェック
-    const { data: existingAssociations } = await supabase
-      .from('user_companies')
-      .select('*')
+    // 既存のユーザーをline_user_idで検索
+    const { data: existingUsers } = await supabaseAdmin
+      .from('users')
+      .select('id')
       .eq('line_user_id', lineUserId)
-      .eq('company_id', company.id)
+
+    // すでに連携済みかチェック（ユーザーが存在する場合のみ）
+    let existingAssociations = null
+    if (existingUsers && existingUsers.length > 0) {
+      const { data } = await supabaseAdmin
+        .from('user_companies')
+        .select('*')
+        .eq('user_id', existingUsers[0].id)
+        .eq('company_id', company.id)
+      existingAssociations = data
+    }
 
     if (existingAssociations && existingAssociations.length > 0) {
       return NextResponse.json({ error: 'すでに連携済みです' }, { status: 400 })
     }
 
-    // usersテーブルにユーザーを作成
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .insert({
-        line_user_id: lineUserId
-      })
-      .select()
-      .single()
+    // 既存ユーザーがいる場合はそれを使用、いない場合は新規作成
+    let user
+    if (existingUsers && existingUsers.length > 0) {
+      user = existingUsers[0]
+    } else {
+      const { data: newUser, error: userError } = await supabaseAdmin
+        .from('users')
+        .insert({
+          line_user_id: lineUserId
+        })
+        .select()
+        .single()
 
-    if (userError) {
-      console.error('User creation error:', userError)
-      return NextResponse.json({ error: 'ユーザー作成に失敗しました' }, { status: 500 })
+      if (userError) {
+        console.error('User creation error:', userError)
+        return NextResponse.json({ error: 'ユーザー作成に失敗しました' }, { status: 500 })
+      }
+      user = newUser
     }
 
     // ユーザーと会社を連携
-    const { error: associationError } = await supabase
+    const { error: associationError } = await supabaseAdmin
       .from('user_companies')
       .insert({
         user_id: user.id,

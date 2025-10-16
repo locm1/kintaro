@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,7 +10,7 @@ export async function POST(request: NextRequest) {
     const code = Math.random().toString(36).substring(2, 10).toUpperCase()
 
     // 会社を登録（admin_idは後で設定）
-    const { data: company, error: companyError } = await supabase
+    const { data: company, error: companyError } = await supabaseAdmin
       .from('companies')
       .insert({
         name,
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // usersテーブルに管理者ユーザーを作成
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .insert({
         line_user_id: lineUserId
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ユーザーと会社の関連付け（管理者として）
-    const { error: userCompanyError } = await supabase
+    const { error: userCompanyError } = await supabaseAdmin
       .from('user_companies')
       .insert({
         user_id: user.id,
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 会社のadmin_idを更新
-    const { error: updateCompanyError } = await supabase
+    const { error: updateCompanyError } = await supabaseAdmin
       .from('companies')
       .update({ admin_id: user.id })
       .eq('id', company.id)
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const { data: companies, error } = await supabase
+    const { data: companies, error } = await supabaseAdmin
       .from('companies')
       .select('id, name, code')
       .order('name')

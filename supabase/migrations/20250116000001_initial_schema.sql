@@ -1,15 +1,15 @@
--- Create users table and initial schema for attendance management system
+-- Create users table and initial schema for attendance management
 -- This migration sets up the complete database schema with proper relationships
 
 -- Enable necessary extensions
 create extension if not exists "uuid-ossp";
 
--- Create users table (extends auth.users)
+-- Create users table (independent for LINE authentication)
 create table public.users (
-  id uuid references auth.users(id) on delete cascade primary key,
+  id uuid default gen_random_uuid() primary key,
   name text,
   email text,
-  line_user_id text unique,
+  line_user_id text unique not null,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -65,78 +65,89 @@ alter table public.companies enable row level security;
 alter table public.user_companies enable row level security;
 alter table public.attendance_records enable row level security;
 
--- RLS Policies for users table
-create policy "Users can view own profile" on public.users
-  for select using (auth.uid() = id);
-
-create policy "Users can update own profile" on public.users
-  for update using (auth.uid() = id);
-
-create policy "Users can insert own profile" on public.users
-  for insert with check (auth.uid() = id);
+-- RLS Policies for users table (LINE authentication based)
+-- Users table is managed via API routes with service role
+create policy "Users are manageable via service role" on public.users
+  for all using (true);
 
 -- RLS Policies for companies table
 create policy "Companies are viewable by associated users" on public.companies
   for select using (
     id in (
       select company_id from public.user_companies 
-      where user_id = auth.uid()
+      where user_id in (
+        select id from public.users where line_user_id = current_setting('app.current_line_user_id', true)
+      )
     )
   );
 
 create policy "Companies can be inserted by authenticated users" on public.companies
-  for insert with check (auth.uid() is not null);
+  for insert with check (true);
 
 create policy "Companies can be updated by admin users" on public.companies
   for update using (
-    admin_id = auth.uid() or 
+    admin_id in (
+      select id from public.users where line_user_id = current_setting('app.current_line_user_id', true)
+    ) or 
     id in (
       select company_id from public.user_companies 
-      where user_id = auth.uid() and is_admin = true
+      where user_id in (
+        select id from public.users where line_user_id = current_setting('app.current_line_user_id', true)
+      ) and is_admin = true
     )
   );
 
 -- RLS Policies for user_companies table
 create policy "User companies are viewable by the user" on public.user_companies
-  for select using (user_id = auth.uid());
+  for select using (
+    user_id in (
+      select id from public.users where line_user_id = current_setting('app.current_line_user_id', true)
+    )
+  );
 
 create policy "User companies can be inserted by the user" on public.user_companies
-  for insert with check (user_id = auth.uid());
+  for insert with check (true);
 
 create policy "User companies can be updated by admin users" on public.user_companies
   for update using (
-    user_id = auth.uid() or 
+    user_id in (
+      select id from public.users where line_user_id = current_setting('app.current_line_user_id', true)
+    ) or 
     company_id in (
       select company_id from public.user_companies 
-      where user_id = auth.uid() and is_admin = true
+      where user_id in (
+        select id from public.users where line_user_id = current_setting('app.current_line_user_id', true)
+      ) and is_admin = true
     )
   );
 
 -- RLS Policies for attendance_records table
 create policy "Attendance records are viewable by user and company admins" on public.attendance_records
   for select using (
-    user_id = auth.uid() or 
+    user_id in (
+      select id from public.users where line_user_id = current_setting('app.current_line_user_id', true)
+    ) or 
     company_id in (
       select company_id from public.user_companies 
-      where user_id = auth.uid() and is_admin = true
+      where user_id in (
+        select id from public.users where line_user_id = current_setting('app.current_line_user_id', true)
+      ) and is_admin = true
     )
   );
 
 create policy "Attendance records can be inserted by the user" on public.attendance_records
-  for insert with check (
-    user_id = auth.uid() or 
-    company_id in (
-      select company_id from public.user_companies 
-      where user_id = auth.uid() and is_admin = true
-    )
-  );
+  for insert with check (true);
 
 create policy "Attendance records can be updated by user and company admins" on public.attendance_records
   for update using (
-    user_id = auth.uid() or 
+    user_id in (
+      select id from public.users where line_user_id = current_setting('app.current_line_user_id', true)
+    ) or 
     company_id in (
       select company_id from public.user_companies 
-      where user_id = auth.uid() and is_admin = true
+      where user_id in (
+        select id from public.users where line_user_id = current_setting('app.current_line_user_id', true)
+      ) and is_admin = true
     )
   );
 
