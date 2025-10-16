@@ -1,29 +1,41 @@
+-- NOTE: This file is now deprecated. 
+-- Use Supabase migrations instead: supabase/migrations/20250116000001_initial_schema.sql
+
+-- ユーザーテーブル（auth.usersの拡張）
+CREATE TABLE users (
+    id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+    name TEXT,
+    email TEXT,
+    line_user_id TEXT UNIQUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- 会社テーブル
 CREATE TABLE companies (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    name VARCHAR NOT NULL,
-    code VARCHAR UNIQUE NOT NULL,
-    admin_id UUID NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    name TEXT NOT NULL,
+    code TEXT UNIQUE NOT NULL,
+    admin_id UUID REFERENCES users(id) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ユーザーと会社の関連テーブル
 CREATE TABLE user_companies (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     is_admin BOOLEAN DEFAULT FALSE,
-    line_user_id VARCHAR,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(user_id, company_id)
 );
 
 -- 勤怠記録テーブル
 CREATE TABLE attendance_records (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     date DATE NOT NULL,
     clock_in TIMESTAMP WITH TIME ZONE,
@@ -37,19 +49,30 @@ CREATE TABLE attendance_records (
 );
 
 -- インデックス作成
+CREATE INDEX idx_users_line_user_id ON users(line_user_id);
 CREATE INDEX idx_companies_code ON companies(code);
 CREATE INDEX idx_user_companies_user_id ON user_companies(user_id);
 CREATE INDEX idx_user_companies_company_id ON user_companies(company_id);
-CREATE INDEX idx_user_companies_line_user_id ON user_companies(line_user_id);
 CREATE INDEX idx_attendance_records_user_company_date ON attendance_records(user_id, company_id, date);
 CREATE INDEX idx_attendance_records_company_date ON attendance_records(company_id, date);
 
 -- RLS (Row Level Security) 有効化
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attendance_records ENABLE ROW LEVEL SECURITY;
 
 -- RLS ポリシー設定
+
+-- users テーブルのポリシー
+CREATE POLICY "Users can view own profile" ON users
+    FOR SELECT USING (id = auth.uid());
+
+CREATE POLICY "Users can update own profile" ON users
+    FOR UPDATE USING (id = auth.uid());
+
+CREATE POLICY "Users can insert own profile" ON users
+    FOR INSERT WITH CHECK (id = auth.uid());
 
 -- companies テーブルのポリシー
 CREATE POLICY "Companies are viewable by associated users" ON companies

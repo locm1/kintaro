@@ -22,27 +22,42 @@ function verifySignature(body: string, signature: string): boolean {
 // 勤怠記録をデータベースに保存
 async function recordAttendance(lineUserId: string, action: string) {
   try {
-    // LINEユーザーIDからユーザー情報を取得
+    console.log('🔍 Looking for user with LINE ID:', lineUserId)
+    
+    // LINE User IDからユーザー情報を取得
     const { data: user, error: userError } = await supabase
       .from('users')
       .select(`
         *,
         user_companies (
-          company:companies (*)
+          *,
+          companies (*)
         )
       `)
       .eq('line_user_id', lineUserId)
       .single()
 
+    console.log('🔍 User query result:', { user, error: userError })
+
     if (userError || !user) {
+      console.log('❌ User not found. Error:', userError)
+      
+      // デバッグ用：全ユーザーを確認
+      const { data: allUsers } = await supabase
+        .from('users')
+        .select('id, name, line_user_id')
+      console.log('📊 All users:', allUsers)
+      
       return {
         success: false,
-        error: '❌ ユーザーが見つかりません。\n会社連携を行ってください。'
+        error: `❌ ユーザーが見つかりません。\nLINE ID: ${lineUserId}\n会社連携を行ってください。`
       }
     }
 
+    // 最初の会社情報を使用
     const userCompany = user.user_companies?.[0]
-    if (!userCompany) {
+    
+    if (!userCompany || !userCompany.companies) {
       return {
         success: false,
         error: '❌ 会社との連携が確認できません。\n会社連携を行ってください。'
@@ -108,7 +123,7 @@ async function recordAttendance(lineUserId: string, action: string) {
         .from('attendance_records')
         .insert({
           user_id: user.id,
-          company_id: userCompany.company.id,
+          company_id: userCompany.company_id,
           date: todayStr,
           clock_in: jstDate.toISOString(),
           status: 'present'
@@ -138,7 +153,7 @@ async function recordAttendance(lineUserId: string, action: string) {
       success: true,
       record: attendanceRecord,
       user: user,
-      company: userCompany.company
+      company: userCompany.companies
     }
 
   } catch (error) {
@@ -291,7 +306,7 @@ async function quickAttendanceAction(event: any, action: string) {
       
       const message = `✅ ${actionName}記録が完了しました\n\n` +
         `📅 日時: ${timestamp}\n` +
-        `👤 ユーザー: ${result.user?.name || 'ゲスト'}\n` +
+        `👤 ユーザー: ${result.user?.name || '名前未設定'}\n` +
         `🏢 会社: ${result.company?.name || '未連携'}\n\n` +
         `詳細な勤怠管理は画面でご確認ください。`
       

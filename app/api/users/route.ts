@@ -10,14 +10,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'LINE User ID is required' }, { status: 400 })
     }
 
-    // LINEユーザーIDから関連付けされたユーザー情報を取得
-    const { data: userCompanies, error } = await supabase
-      .from('user_companies')
+    // LINEユーザーIDからユーザー情報を取得
+    const { data: user, error } = await supabase
+      .from('users')
       .select(`
         *,
-        companies(*)
+        user_companies (
+          *,
+          companies (*)
+        )
       `)
       .eq('line_user_id', lineUserId)
+      .single()
 
     if (error) {
       console.error('Error fetching user:', error)
@@ -25,16 +29,19 @@ export async function GET(request: NextRequest) {
     }
 
     // ユーザーが存在しない場合
-    if (!userCompanies || userCompanies.length === 0) {
+    if (!user || !user.user_companies || user.user_companies.length === 0) {
       return NextResponse.json({ user: null })
     }
 
     // 最初の会社情報を返す（複数の会社に所属している場合は最初のもの）
-    const userCompany = userCompanies[0]
+    const userCompany = user.user_companies[0]
     
     return NextResponse.json({ 
       user: {
-        id: userCompany.user_id,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        lineUserId: user.line_user_id,
         companyId: userCompany.company_id,
         isAdmin: userCompany.is_admin,
         company: userCompany.companies
