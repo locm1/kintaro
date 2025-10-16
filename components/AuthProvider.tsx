@@ -30,7 +30,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isInitializing, setIsInitializing] = useState(true)
 
+  // APIルートの場合は認証処理をスキップ
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname
+      // APIパスの場合は認証処理を実行しない
+      if (pathname.startsWith('/api/')) {
+        console.log('API path detected, skipping auth initialization')
+        setIsLoading(false)
+        setIsInitializing(false)
+        setIsAuthenticated(true) // APIでは認証不要
+        return
+      }
+    }
+    
     initializeAuth()
   }, [])
 
@@ -121,6 +134,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
 
+
+  // APIパスの場合は認証処理をスキップして直接childrenを返す
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/api/')) {
+    return <>{children}</>
+  }
 
   // 初期化中またはリダイレクト処理中の画面
   if (isInitializing || (isLoading && !isAuthenticated)) {
