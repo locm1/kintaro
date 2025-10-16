@@ -2,6 +2,8 @@
 require('dotenv').config({ path: '.env.local' });
 
 const axios = require('axios');
+const fs = require('fs');
+const { createCanvas } = require('canvas');
 
 // 環境変数から取得
 const CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -35,7 +37,7 @@ const richMenuData = {
     width: 2500,
     height: 1686
   },
-  selected: false,
+  selected: true,
   name: "勤怠太郎ミニアプリメニュー",
   chatBarText: "メニュー",
   areas: [
@@ -83,8 +85,8 @@ const richMenuData = {
         height: 843
       },
       action: {
-        type: "uri",
-        uri: `${MINI_APP_BASE_URL}/attendance?action=clock_in`
+        type: "postback",
+        data: "action=clock_in"
       }
     },
     {
@@ -95,16 +97,135 @@ const richMenuData = {
         height: 843
       },
       action: {
-        type: "uri",
-        uri: `${MINI_APP_BASE_URL}/attendance?action=clock_out`
+        type: "postback",
+        data: "action=clock_out"
       }
     }
   ]
 };
 
+// リッチメニュー画像を生成
+function generateRichMenuImage() {
+  console.log('🎨 リッチメニュー画像を生成中...');
+  
+  // 2500x1686のキャンバスを作成
+  const canvas = createCanvas(2500, 1686);
+  const ctx = canvas.getContext('2d');
+
+  // 背景のグラデーション
+  const gradient = ctx.createLinearGradient(0, 0, 0, 1686);
+  gradient.addColorStop(0, '#667eea');
+  gradient.addColorStop(1, '#764ba2');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 2500, 1686);
+
+  // 区切り線を描画
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 6;
+  
+  // 縦の区切り線（上段）
+  ctx.beginPath();
+  ctx.moveTo(833, 0);
+  ctx.lineTo(833, 843);
+  ctx.stroke();
+  
+  ctx.beginPath();
+  ctx.moveTo(1667, 0);
+  ctx.lineTo(1667, 843);
+  ctx.stroke();
+
+  // 横の区切り線
+  ctx.beginPath();
+  ctx.moveTo(0, 843);
+  ctx.lineTo(2500, 843);
+  ctx.stroke();
+
+  // 縦の区切り線（下段）
+  ctx.beginPath();
+  ctx.moveTo(1250, 843);
+  ctx.lineTo(1250, 1686);
+  ctx.stroke();
+
+  // 各エリアに背景色を追加
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+  
+  // 上段エリア（ホバー効果）
+  ctx.fillRect(10, 10, 813, 823);
+  ctx.fillRect(843, 10, 814, 823);
+  ctx.fillRect(1677, 10, 813, 823);
+  
+  // 下段エリア
+  ctx.fillRect(10, 853, 1230, 823);
+  ctx.fillRect(1260, 853, 1230, 823);
+
+  // テキストを描画
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 70px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+  ctx.shadowOffsetX = 3;
+  ctx.shadowOffsetY = 3;
+  ctx.shadowBlur = 6;
+
+  // 絵文字を描画
+  ctx.font = 'bold 150px sans-serif';
+  ctx.fillText('🏢', 416, 320);
+  ctx.fillText('📊', 1250, 320);
+  ctx.fillText('🏠', 2084, 320);
+  ctx.fillText('⏰', 625, 1150);
+  ctx.fillText('🌅', 1875, 1150);
+
+  // テキストを描画
+  ctx.font = 'bold 65px sans-serif';
+  ctx.fillText('会社連携', 416, 500);
+  ctx.fillText('勤怠管理', 1250, 500);
+  ctx.fillText('ホーム', 2084, 500);
+
+  ctx.font = 'bold 85px sans-serif';
+  ctx.fillText('出勤', 625, 1350);
+  ctx.fillText('退勤', 1875, 1350);
+
+  // 影をリセット
+  ctx.shadowColor = 'transparent';
+
+  return canvas.toBuffer('image/png');
+}
+
+// リッチメニューに画像をアップロード
+async function uploadRichMenuImage(richMenuId, imageBuffer) {
+  console.log('📤 画像をアップロード中...');
+  console.log('📁 ファイルサイズ:', Math.round(imageBuffer.length / 1024), 'KB');
+
+  try {
+    await axios.post(
+      `https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`,
+      imageBuffer,
+      {
+        headers: {
+          'Authorization': `Bearer ${CHANNEL_ACCESS_TOKEN}`,
+          'Content-Type': 'image/png'
+        }
+      }
+    );
+
+    console.log('✅ 画像アップロード完了');
+    return true;
+  } catch (error) {
+    console.error('❌ 画像アップロードエラー:', error.response?.data || error.message);
+    if (error.response?.status === 400) {
+      console.log('💡 画像サイズやフォーマットを確認してください');
+      console.log('   - サイズ: 2500×1686px');
+      console.log('   - フォーマット: PNG/JPEG');
+      console.log('   - ファイルサイズ: 1MB以下');
+    }
+    return false;
+  }
+}
+
 async function createRichMenu() {
   try {
-    // リッチメニューを作成
+    // 1. リッチメニューを作成
+    console.log('🔄 リッチメニューを作成中...');
     const response = await axios.post(
       'https://api.line.me/v2/bot/richmenu',
       richMenuData,
@@ -120,14 +241,41 @@ async function createRichMenu() {
     console.log('✅ リッチメニューが作成されました');
     console.log('📋 リッチメニューID:', richMenuId);
 
-    // 注意: 画像をアップロード後にデフォルト設定が必要
-    console.log('⚠️  画像をアップロードするまでデフォルト設定はできません');
+    // 2. 画像を生成
+    const imageBuffer = generateRichMenuImage();
+    console.log('✅ 画像生成完了');
+
+    // 3. 画像をアップロード
+    const uploadSuccess = await uploadRichMenuImage(richMenuId, imageBuffer);
+    
+    if (!uploadSuccess) {
+      console.log('❌ 画像アップロードに失敗しました');
+      return;
+    }
+
+    // 4. デフォルトリッチメニューに設定
+    console.log('🔄 デフォルトリッチメニューに設定中...');
+    try {
+      await axios.post(
+        `https://api.line.me/v2/bot/user/all/richmenu/${richMenuId}`,
+        {},
+        {
+          headers: {
+            'Authorization': `Bearer ${CHANNEL_ACCESS_TOKEN}`
+          }
+        }
+      );
+      
+      console.log('✅ デフォルトリッチメニューに設定完了');
+    } catch (defaultError) {
+      console.error('❌ デフォルト設定エラー:', defaultError.response?.data || defaultError.message);
+    }
+
+    // 完了メッセージ
     console.log('');
-    console.log('📸 次の手順:');
-    console.log('1. LINE Developersコンソールにアクセス');
-    console.log('2. チャネル設定 → リッチメニュー');
-    console.log(`3. リッチメニューID: ${richMenuId} に画像をアップロード`);
-    console.log('4. 画像サイズ: 2500×1686px (PNG/JPEG, 1MB以下)');
+    console.log('🎉 リッチメニューのセットアップが完了しました！');
+    console.log('📱 LINE公式アカウントを確認してください');
+    console.log('💡 リッチメニューが表示されるまで数分かかる場合があります');
     console.log('');
     console.log('🔗 設定されたURL:');
     console.log('- 会社連携:', `${MINI_APP_BASE_URL}/link`);
@@ -135,8 +283,9 @@ async function createRichMenu() {
     console.log('- ホーム:', `${MINI_APP_BASE_URL}/`);
     console.log('- 出勤:', `${MINI_APP_BASE_URL}/attendance?action=clock_in`);
     console.log('- 退勤:', `${MINI_APP_BASE_URL}/attendance?action=clock_out`);
+    
   } catch (error) {
-    console.error('エラー:', error.response?.data || error.message);
+    console.error('❌ リッチメニュー作成エラー:', error.response?.data || error.message);
   }
 }
 
@@ -221,15 +370,20 @@ switch (command) {
     break;
   default:
     console.log('📖 使用方法:');
-    console.log('  node setup-richmenu-miniapp.js create              - リッチメニューを作成');
-    console.log('  node setup-richmenu-miniapp.js list                - リッチメニュー一覧を表示');
-    console.log('  node setup-richmenu-miniapp.js delete <id>         - リッチメニューを削除');
-    console.log('  node setup-richmenu-miniapp.js set-default <id>    - リッチメニューをデフォルトに設定');
+    console.log('  node scripts/setup-richmenu-miniapp.js create              - リッチメニューを作成（画像付き・デフォルト設定込み）');
+    console.log('  node scripts/setup-richmenu-miniapp.js list                - リッチメニュー一覧を表示');
+    console.log('  node scripts/setup-richmenu-miniapp.js delete <id>         - リッチメニューを削除');
+    console.log('  node scripts/setup-richmenu-miniapp.js set-default <id>    - リッチメニューをデフォルトに設定');
     console.log('');
-    console.log('💡 手順:');
-    console.log('  1. create でリッチメニューを作成');
-    console.log('  2. LINE Developersで画像をアップロード');
-    console.log('  3. set-default でデフォルト設定');
+    console.log('💡 簡単セットアップ:');
+    console.log('  1. create でリッチメニューを作成（全て自動）');
+    console.log('  2. 数分後にLINE公式アカウントで確認');
+    console.log('');
+    console.log('🎨 createコマンドの機能:');
+    console.log('  ✅ リッチメニュー作成');
+    console.log('  ✅ 画像自動生成');
+    console.log('  ✅ 画像アップロード');
+    console.log('  ✅ デフォルト設定');
 }
 
 module.exports = { createRichMenu, listRichMenus, deleteRichMenu };

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { createClient } from '@supabase/supabase-js'
 
 const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET!
+
+// Supabaseクライアント設定
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 // LINE Webhook署名検証
 function verifySignature(body: string, signature: string): boolean {
@@ -11,6 +17,137 @@ function verifySignature(body: string, signature: string): boolean {
     .digest('base64')
   
   return signature === hash
+}
+
+// 勤怠記録をデータベースに保存
+async function recordAttendance(lineUserId: string, action: string) {
+  try {
+    // LINEユーザーIDからユーザー情報を取得
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select(`
+        *,
+        user_companies (
+          company:companies (*)
+        )
+      `)
+      .eq('line_user_id', lineUserId)
+      .single()
+
+    if (userError || !user) {
+      return {
+        success: false,
+        error: '❌ ユーザーが見つかりません。\n会社連携を行ってください。'
+      }
+    }
+
+    const userCompany = user.user_companies?.[0]
+    if (!userCompany) {
+      return {
+        success: false,
+        error: '❌ 会社との連携が確認できません。\n会社連携を行ってください。'
+      }
+    }
+
+    // 勤怠記録の種別を確認
+    const attendanceType = action === 'clock_in' ? 'clock_in' : 
+                          action === 'clock_out' ? 'clock_out' : null
+
+    if (!attendanceType) {
+      return {
+        success: false,
+        error: '❌ 無効なアクションです。'
+      }
+    }
+
+    // 今日の日付を取得（UTC→JSTに変換）
+    const now = new Date()
+    const jstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000))
+    const todayStr = jstDate.toISOString().split('T')[0]
+
+    // 今日の最新の勤怠記録を確認
+    const { data: latestRecord } = await supabase
+      .from('attendance_records')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('date', todayStr)
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    // 出勤の場合：今日の出勤記録がないかチェック
+    if (attendanceType === 'clock_in') {
+      if (latestRecord && latestRecord.length > 0 && latestRecord[0].clock_in) {
+        return {
+          success: false,
+          error: '❌ 本日はすでに出勤済みです。'
+        }
+      }
+    }
+
+    // 退勤の場合：出勤記録があるかチェック
+    if (attendanceType === 'clock_out') {
+      if (!latestRecord || latestRecord.length === 0 || !latestRecord[0]?.clock_in) {
+        return {
+          success: false,
+          error: '❌ 出勤記録がありません。\n先に出勤記録を行ってください。'
+        }
+      }
+      if (latestRecord[0].clock_out) {
+        return {
+          success: false,
+          error: '❌ 本日はすでに退勤済みです。'
+        }
+      }
+    }
+
+    // 勤怠記録を保存
+    let attendanceRecord
+    if (attendanceType === 'clock_in') {
+      // 新しい出勤記録を作成
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .insert({
+          user_id: user.id,
+          company_id: userCompany.company.id,
+          date: todayStr,
+          clock_in: jstDate.toISOString(),
+          status: 'present'
+        })
+        .select('*')
+        .single()
+
+      if (error) throw error
+      attendanceRecord = data
+    } else {
+      // 既存の記録に退勤時刻を更新
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .update({
+          clock_out: jstDate.toISOString(),
+          status: 'present'
+        })
+        .eq('id', latestRecord![0].id)
+        .select('*')
+        .single()
+
+      if (error) throw error
+      attendanceRecord = data
+    }
+
+    return {
+      success: true,
+      record: attendanceRecord,
+      user: user,
+      company: userCompany.company
+    }
+
+  } catch (error) {
+    console.error('勤怠記録エラー:', error)
+    return {
+      success: false,
+      error: '❌ 記録の保存に失敗しました。'
+    }
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -133,15 +270,39 @@ async function quickAttendanceAction(event: any, action: string) {
   const { replyToken, source } = event
   const userId = source.userId
 
-  // 簡易的な勤怠記録処理（実際のユーザー認証が必要）
-  const actionNames: { [key: string]: string } = {
-    'clock_in': '出勤',
-    'clock_out': '退勤'
+  try {
+    // データベースに勤怠記録を保存
+    const result = await recordAttendance(userId, action)
+    
+    if (result.success) {
+      const actionNames: { [key: string]: string } = {
+        'clock_in': '出勤',
+        'clock_out': '退勤'
+      }
+      
+      const actionName = actionNames[action] || action
+      const timestamp = new Date().toLocaleString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+      
+      const message = `✅ ${actionName}記録が完了しました\n\n` +
+        `📅 日時: ${timestamp}\n` +
+        `👤 ユーザー: ${result.user?.name || 'ゲスト'}\n` +
+        `🏢 会社: ${result.company?.name || '未連携'}\n\n` +
+        `詳細な勤怠管理は画面でご確認ください。`
+      
+      await replyMessage(replyToken, message)
+    } else {
+      await replyMessage(replyToken, result.error || '記録に失敗しました。会社連携を確認してください。')
+    }
+  } catch (error) {
+    console.error('勤怠記録エラー:', error)
+    await replyMessage(replyToken, 'エラーが発生しました。しばらく後にもう一度お試しください。')
   }
-
-  const actionName = actionNames[action] || action
-  const message = `${actionName}記録を受け付けました。\n詳細な管理は勤怠管理画面をご利用ください。`
-  await replyMessage(replyToken, message)
 }
 
 async function handleFollow(event: any) {
