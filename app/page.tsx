@@ -1,11 +1,125 @@
 'use client'
 
-import { Building2, Users, Clock } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Building2, Users, Clock, Copy, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/components/AuthProvider'
 
+interface User {
+  id: string
+  name: string
+  email: string
+  lineUserId: string
+  companyId: string
+  isAdmin: boolean
+  company: {
+    id: string
+    name: string
+    code: string
+  }
+}
+
+interface AttendanceRecord {
+  id: string
+  date: string
+  clock_in: string | null
+  clock_out: string | null
+  break_start: string | null
+  break_end: string | null
+  status: string
+}
+
 export default function Home() {
   const { userProfile } = useAuth()
+  const [user, setUser] = useState<User | null>(null)
+  const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null)
+  const [attendanceStatus, setAttendanceStatus] = useState<string>('未出勤')
+  const [isLoading, setIsLoading] = useState(false)
+  const [copiedCode, setCopiedCode] = useState(false)
+
+  useEffect(() => {
+    if (userProfile?.userId) {
+      loadUserAndTodayRecord(userProfile.userId)
+    }
+  }, [userProfile])
+
+  const loadUserAndTodayRecord = async (lineUserId: string) => {
+    try {
+      setIsLoading(true)
+      
+      // ユーザー情報を取得
+      const userResponse = await fetch(`/api/users?lineUserId=${lineUserId}`)
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        if (userData.user) {
+          setUser(userData.user)
+          
+          // 今日の勤怠記録を取得
+          await loadTodayRecord(userData.user.id, userData.user.companyId)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const loadTodayRecord = async (userId: string, companyId: string) => {
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const response = await fetch(`/api/attendance?userId=${userId}&companyId=${companyId}&date=${today}`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        const record = data.records?.[0]
+        setTodayRecord(record)
+        updateAttendanceStatus(record)
+      }
+    } catch (error) {
+      console.error('Error loading today record:', error)
+    }
+  }
+
+  const updateAttendanceStatus = (record: AttendanceRecord | null) => {
+    if (!record || !record.clock_in) {
+      setAttendanceStatus('未出勤')
+      return
+    }
+
+    if (record.clock_out) {
+      setAttendanceStatus('退勤済み')
+      return
+    }
+
+    if (record.break_start && !record.break_end) {
+      setAttendanceStatus('休憩中')
+      return
+    }
+
+    setAttendanceStatus('出勤中')
+  }
+
+  const copyCompanyCode = async () => {
+    if (user?.company?.code) {
+      try {
+        await navigator.clipboard.writeText(user.company.code)
+        setCopiedCode(true)
+        setTimeout(() => setCopiedCode(false), 2000)
+      } catch (error) {
+        console.error('Failed to copy:', error)
+      }
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case '出勤中': return 'text-green-600 bg-green-100'
+      case '休憩中': return 'text-yellow-600 bg-yellow-100'
+      case '退勤済み': return 'text-blue-600 bg-blue-100'
+      default: return 'text-gray-600 bg-gray-100'
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -19,17 +133,123 @@ export default function Home() {
         </div>
 
         <div className="space-y-6">
+          {/* 勤怠ステータス表示 */}
+          {user && (
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="text-center mb-4">
+                <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(attendanceStatus)}`}>
+                  <Clock className="w-4 h-4 mr-2" />
+                  {attendanceStatus}
+                </div>
+              </div>
+              
+              {todayRecord && (
+                <div className="space-y-2 text-sm text-gray-600">
+                  {todayRecord.clock_in && (
+                    <div className="flex justify-between">
+                      <span>出勤時刻:</span>
+                      <span className="font-medium">
+                        {new Date(todayRecord.clock_in).toLocaleTimeString('ja-JP', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  {todayRecord.break_start && (
+                    <div className="flex justify-between">
+                      <span>休憩開始:</span>
+                      <span className="font-medium">
+                        {new Date(todayRecord.break_start).toLocaleTimeString('ja-JP', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  {todayRecord.break_end && (
+                    <div className="flex justify-between">
+                      <span>休憩終了:</span>
+                      <span className="font-medium">
+                        {new Date(todayRecord.break_end).toLocaleTimeString('ja-JP', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  {todayRecord.clock_out && (
+                    <div className="flex justify-between">
+                      <span>退勤時刻:</span>
+                      <span className="font-medium">
+                        {new Date(todayRecord.clock_out).toLocaleTimeString('ja-JP', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 会社情報表示 */}
+          {user?.company && (
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <Building2 className="w-5 h-5 mr-2 text-blue-600" />
+                所属会社
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <span className="text-sm text-gray-600">会社名</span>
+                  <p className="font-medium text-gray-800">{user.company.name}</p>
+                </div>
+                <div>
+                  <span className="text-sm text-gray-600">会社コード</span>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <code className="bg-gray-100 px-3 py-1 rounded font-mono text-sm">
+                      {user.company.code}
+                    </code>
+                    <button
+                      onClick={copyCompanyCode}
+                      className="p-1 text-gray-500 hover:text-blue-600 transition"
+                      title="コピー"
+                    >
+                      {copiedCode ? (
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                  {copiedCode && (
+                    <p className="text-xs text-green-600 mt-1">コピーしました！</p>
+                  )}
+                </div>
+                {user.isAdmin && (
+                  <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded inline-block">
+                    管理者
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="bg-white rounded-lg shadow-md p-6 text-center">
             <Building2 className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">会社連携</h2>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">
+              {user ? '会社設定' : '会社連携'}
+            </h2>
             <p className="text-gray-600 mb-4">
-              まずは勤務先の会社と連携しましょう
+              {user ? '会社情報の確認・変更ができます' : 'まずは勤務先の会社と連携しましょう'}
             </p>
             <Link
               href="/link"
               className="inline-block bg-blue-600 text-white py-2 px-6 rounded-lg font-semibold hover:bg-blue-700 transition"
             >
-              会社連携を開始
+              {user ? '会社設定' : '会社連携を開始'}
             </Link>
           </div>
 
@@ -48,17 +268,25 @@ export default function Home() {
           </div>
 
           {userProfile && (
-            <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div className="bg-white rounded-lg shadow-md p-4">
               <div className="flex items-center space-x-3">
                 <img 
                   src={userProfile.pictureUrl || 'https://via.placeholder.com/50'} 
                   alt="Profile" 
                   className="w-12 h-12 rounded-full"
                 />
-                <div>
+                <div className="flex-1">
                   <p className="font-semibold text-gray-800">{userProfile.displayName}</p>
                   <p className="text-sm text-gray-600">LINEユーザー</p>
+                  {user && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      {user.company?.name || '会社未連携'}
+                    </p>
+                  )}
                 </div>
+                {isLoading && (
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                )}
               </div>
             </div>
           )}
