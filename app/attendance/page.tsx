@@ -124,6 +124,41 @@ export default function AttendancePage() {
   const handleAttendanceAction = async (action: string) => {
     if (!user) return
 
+    // 現在の記録を取得
+    const currentRecord = getTodayRecord()
+    
+    // アクション別のガード処理
+    switch (action) {
+      case 'clock_in':
+        if (currentRecord?.clock_in) {
+          setMessage('すでに出勤済みです')
+          return
+        }
+        break
+      case 'clock_out':
+        if (!currentRecord?.clock_in || currentRecord?.clock_out) {
+          setMessage('出勤記録がないか、すでに退勤済みです')
+          return
+        }
+        break
+      case 'break_start':
+        if (!currentRecord?.clock_in) {
+          setMessage('出勤記録がありません')
+          return
+        }
+        if (currentRecord?.break_start && !currentRecord?.break_end) {
+          setMessage('すでに休憩中です')
+          return
+        }
+        break
+      case 'break_end':
+        if (!currentRecord?.break_start || currentRecord?.break_end) {
+          setMessage('休憩開始記録がないか、すでに休憩終了済みです')
+          return
+        }
+        break
+    }
+
     setIsLoading(true)
     try {
       const response = await fetch('/api/attendance', {
@@ -410,11 +445,11 @@ export default function AttendancePage() {
         <div className="grid grid-cols-2 gap-4 mb-6">
           <button
             onClick={() => handleAttendanceAction('clock_in')}
-            disabled={isLoading}
+            disabled={isLoading || Boolean(currentRecord?.clock_in)}
             className={clsx(
               "p-4 rounded-lg font-semibold transition",
               currentRecord?.clock_in
-                ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                ? "bg-gray-100 text-gray-500 cursor-not-allowed pointer-events-none"
                 : "bg-green-500 text-white hover:bg-green-600"
             )}
           >
@@ -428,7 +463,7 @@ export default function AttendancePage() {
             className={clsx(
               "p-4 rounded-lg font-semibold transition",
               (!currentRecord?.clock_in || currentRecord?.clock_out)
-                ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                ? "bg-gray-100 text-gray-500 cursor-not-allowed pointer-events-none"
                 : "bg-red-500 text-white hover:bg-red-600"
             )}
           >
@@ -442,7 +477,7 @@ export default function AttendancePage() {
             className={clsx(
               "p-4 rounded-lg font-semibold transition",
               (!currentRecord?.clock_in || (currentRecord?.break_start && !currentRecord?.break_end))
-                ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                ? "bg-gray-100 text-gray-500 cursor-not-allowed pointer-events-none"
                 : "bg-yellow-500 text-white hover:bg-yellow-600"
             )}
           >
@@ -455,8 +490,8 @@ export default function AttendancePage() {
             disabled={isLoading || !currentRecord?.break_start || Boolean(currentRecord?.break_end)}
             className={clsx(
               "p-4 rounded-lg font-semibold transition",
-              (!todayRecord?.break_start || todayRecord?.break_end)
-                ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+              (!currentRecord?.break_start || currentRecord?.break_end)
+                ? "bg-gray-100 text-gray-500 cursor-not-allowed pointer-events-none"
                 : "bg-blue-500 text-white hover:bg-blue-600"
             )}
           >
