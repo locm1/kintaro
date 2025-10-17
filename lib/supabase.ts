@@ -13,7 +13,7 @@ export type Database = {
           id: string
           name: string
           code: string
-          admin_id: string | null
+          user_id: string | null
           created_at: string
           updated_at: string
         }
@@ -21,7 +21,7 @@ export type Database = {
           id?: string
           name: string
           code: string
-          admin_id?: string | null
+          user_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -29,7 +29,7 @@ export type Database = {
           id?: string
           name?: string
           code?: string
-          admin_id?: string | null
+          user_id?: string | null
           created_at?: string
           updated_at?: string
         }

@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     // 会社コードを生成（簡単な実装）
     const code = Math.random().toString(36).substring(2, 10).toUpperCase()
 
-    // 会社を登録（admin_idは後で設定）
+    // 会社を登録（user_idは後で設定）
     const { data: company, error: companyError } = await supabaseAdmin
       .from('companies')
       .insert({
@@ -52,10 +52,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to associate user with company' }, { status: 500 })
     }
 
-    // 会社のadmin_idを更新
+    // 会社のuser_idを更新
     const { error: updateCompanyError } = await supabaseAdmin
       .from('companies')
-      .update({ admin_id: user.id })
+      .update({ user_id: user.id })
       .eq('id', company.id)
 
     if (updateCompanyError) {
