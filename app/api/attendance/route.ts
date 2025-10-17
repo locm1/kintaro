@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString()
 
     // 今日の勤怠記録を取得または作成
-    let { data: record, error: fetchError } = await supabase
+    let { data: record, error: fetchError } = await supabaseAdmin
       .from('attendance_records')
       .select('*')
       .eq('user_id', userId)
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     // 記録が存在しない場合は新規作成
     if (!record) {
-      const { data: newRecord, error: createError } = await supabase
+      const { data: newRecord, error: createError } = await supabaseAdmin
         .from('attendance_records')
         .insert({
           user_id: userId,
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 記録を更新
-    const { data: updatedRecord, error: updateError } = await supabase
+    const { data: updatedRecord, error: updateError } = await supabaseAdmin
       .from('attendance_records')
       .update(updateData)
       .eq('id', record.id)
@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
     }
 
     // ユーザーが管理者かチェック
-    const { data: userCompanies } = await supabase
+    const { data: userCompanies } = await supabaseAdmin
       .from('user_companies')
       .select('is_admin')
       .eq('user_id', userId)
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
     
     const userCompany = userCompanies?.[0]
 
-    let query = supabase
+    let query = supabaseAdmin
       .from('attendance_records')
       .select(`
         *,
