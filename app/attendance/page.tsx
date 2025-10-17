@@ -35,7 +35,9 @@ export default function AttendancePage() {
   const [user, setUser] = useState<User | null>(null)
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([])
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isPageLoading, setIsPageLoading] = useState(true) // ページ全体のローディング状態
+  const [isRecordsLoading, setIsRecordsLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [showAdmin, setShowAdmin] = useState(false)
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null)
@@ -54,11 +56,16 @@ export default function AttendancePage() {
     if (userProfile?.userId) {
       console.log('👤 Loading records for user ID:', userProfile.userId)
       loadUserAndRecords(userProfile.userId)
+    } else if (!authLoading) {
+      // 認証が完了しているがuserProfileがない場合
+      setIsPageLoading(false)
     }
-  }, [userProfile])
+  }, [userProfile, authLoading])
 
   const loadUserAndRecords = async (lineUserId: string) => {
     try {
+      setIsLoading(true)
+      setIsPageLoading(true)
       console.log('🔍 Loading user with LINE ID:', lineUserId)
       
       const response = await fetch(`/api/users?lineUserId=${lineUserId}`)
@@ -81,6 +88,9 @@ export default function AttendancePage() {
     } catch (error) {
       console.error('Error loading user:', error)
       setMessage('ユーザー情報の取得に失敗しました')
+    } finally {
+      setIsLoading(false)
+      setIsPageLoading(false)
     }
   }
 
@@ -233,7 +243,7 @@ export default function AttendancePage() {
     )
   }
 
-  if (!user) {
+  if (!user && !isPageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="bg-white rounded-lg shadow-md p-6 text-center">
@@ -250,6 +260,81 @@ export default function AttendancePage() {
   }
 
   const currentRecord = getTodayRecord()
+
+  // ローディング状態のレンダリング
+  if (authLoading || isPageLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="max-w-md mx-auto">
+          {/* ヘッダーのスケルトン */}
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+              <Clock className="w-8 h-8 text-gray-400" />
+            </div>
+            <div className="h-8 bg-gray-200 rounded w-32 mx-auto mb-2 animate-pulse"></div>
+            <div className="h-4 bg-gray-200 rounded w-24 mx-auto animate-pulse"></div>
+          </div>
+
+          {/* プロフィールカードのスケルトン */}
+          <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gray-200 rounded-full animate-pulse"></div>
+              <div className="flex-1">
+                <div className="h-4 bg-gray-200 rounded w-20 mb-1 animate-pulse"></div>
+                <div className="h-3 bg-gray-200 rounded w-16 animate-pulse"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* ボタンエリアのスケルトン */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="h-20 bg-gray-200 rounded-lg animate-pulse"></div>
+            <div className="h-20 bg-gray-200 rounded-lg animate-pulse"></div>
+            <div className="h-20 bg-gray-200 rounded-lg animate-pulse"></div>
+            <div className="h-20 bg-gray-200 rounded-lg animate-pulse"></div>
+          </div>
+
+          {/* 今日の記録カードのスケルトン */}
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div className="h-6 bg-gray-200 rounded w-32 mb-4 animate-pulse"></div>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <div className="h-4 bg-gray-200 rounded w-16 animate-pulse"></div>
+                <div className="h-4 bg-gray-200 rounded w-12 animate-pulse"></div>
+              </div>
+              <div className="flex justify-between">
+                <div className="h-4 bg-gray-200 rounded w-20 animate-pulse"></div>
+                <div className="h-4 bg-gray-200 rounded w-8 animate-pulse"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* 管理者エリアのスケルトン */}
+          <div className="space-y-4">
+            <div className="h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+            <div className="h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // userがnullかつページロードが完了している場合のみ「会社との連携が必要です」を表示
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="bg-white rounded-lg shadow-md p-6 text-center">
+          <p className="text-gray-600 mb-4">会社との連携が必要です</p>
+          <a 
+            href="/link" 
+            className="bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition"
+          >
+            会社連携画面へ
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">

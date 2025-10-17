@@ -17,6 +17,7 @@ export default function CompanyLinkPage() {
   const [selectedCompany, setSelectedCompany] = useState('')
   const [companyCode, setCompanyCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isPageLoading, setIsPageLoading] = useState(true) // ページ初期ローディング
   const [message, setMessage] = useState('')
   const [showAdminForm, setShowAdminForm] = useState(false)
   const [newCompanyName, setNewCompanyName] = useState('')
@@ -30,12 +31,23 @@ export default function CompanyLinkPage() {
     }
   }, [userProfile])
 
-  const handleUserProfile = async () => {
+    const handleUserProfile = async () => {
     const lineUserId = userProfile?.userId
     if (lineUserId) {
       try {
+        setIsPageLoading(true)
+        
+        // 開発環境かどうかをチェック
+        const isDevelopment = process.env.NODE_ENV === 'development'
+        const baseUrl = isDevelopment ? 'http://localhost:3001' : ''
+        
         // 既存ユーザーをチェック
-        const response = await fetch(`/api/users?lineUserId=${lineUserId}`)
+        const response = await fetch(`${baseUrl}/api/users?lineUserId=${lineUserId}`)
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        
         const data = await response.json()
         
         if (data.user) {
@@ -47,6 +59,13 @@ export default function CompanyLinkPage() {
         }
       } catch (error) {
         console.error('Error handling user profile:', error)
+        // 開発環境では仮のユーザーIDを設定
+        if (process.env.NODE_ENV === 'development') {
+          setUserId(lineUserId || 'dev-user-id')
+          setMessage('開発環境: 仮のユーザーIDを使用中')
+        }
+      } finally {
+        setIsPageLoading(false)
       }
     }
     
@@ -134,6 +153,50 @@ export default function CompanyLinkPage() {
   }
 
   // 認証は AuthProvider で処理されるため、ここでは初期化画面は不要
+
+  // ページ初期ローディング状態
+  if (isPageLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="max-w-md mx-auto">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Building2 className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-800">勤怠太郎</h1>
+            <p className="text-gray-600 mt-2">会社連携</p>
+          </div>
+
+          {/* プロフィールカードのスケルトン */}
+          <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gray-200 rounded-full animate-pulse"></div>
+              <div className="flex-1">
+                <div className="h-4 bg-gray-200 rounded w-20 mb-1 animate-pulse"></div>
+                <div className="h-3 bg-gray-200 rounded w-16 animate-pulse"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* フォームカードのスケルトン */}
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="h-6 bg-gray-200 rounded w-32 mb-4 animate-pulse"></div>
+              <div className="h-10 bg-gray-200 rounded w-full mb-4 animate-pulse"></div>
+              <div className="h-10 bg-gray-200 rounded w-20 animate-pulse"></div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="h-6 bg-gray-200 rounded w-24 mb-4 animate-pulse"></div>
+              <div className="h-4 bg-gray-200 rounded w-full mb-2 animate-pulse"></div>
+              <div className="h-4 bg-gray-200 rounded w-3/4 mb-4 animate-pulse"></div>
+              <div className="h-10 bg-gray-200 rounded w-28 animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
