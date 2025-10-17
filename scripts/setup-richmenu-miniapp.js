@@ -41,46 +41,11 @@ const richMenuData = {
   name: "勤怠太郎ミニアプリメニュー",
   chatBarText: "メニュー",
   areas: [
+    // 上段左：出勤
     {
       bounds: {
         x: 0,
         y: 0,
-        width: 833,
-        height: 843
-      },
-      action: {
-        type: "uri",
-        uri: `${MINI_APP_BASE_URL}/link`
-      }
-    },
-    {
-      bounds: {
-        x: 833,
-        y: 0,
-        width: 834,
-        height: 843
-      },
-      action: {
-        type: "uri",
-        uri: `${MINI_APP_BASE_URL}/attendance`
-      }
-    },
-    {
-      bounds: {
-        x: 1667,
-        y: 0,
-        width: 833,
-        height: 843
-      },
-      action: {
-        type: "uri",
-        uri: `${MINI_APP_BASE_URL}/`
-      }
-    },
-    {
-      bounds: {
-        x: 0,
-        y: 843,
         width: 1250,
         height: 843
       },
@@ -89,16 +54,56 @@ const richMenuData = {
         text: "出勤"
       }
     },
+    // 上段右：退勤
     {
       bounds: {
         x: 1250,
-        y: 843,
+        y: 0,
         width: 1250,
         height: 843
       },
       action: {
         type: "message",
         text: "退勤"
+      }
+    },
+    // 下段左：休憩開始
+    {
+      bounds: {
+        x: 0,
+        y: 843,
+        width: 833,
+        height: 843
+      },
+      action: {
+        type: "message",
+        text: "休憩開始"
+      }
+    },
+    // 下段中央：休憩終了
+    {
+      bounds: {
+        x: 833,
+        y: 843,
+        width: 834,
+        height: 843
+      },
+      action: {
+        type: "message",
+        text: "休憩終了"
+      }
+    },
+    // 下段右：ホーム
+    {
+      bounds: {
+        x: 1667,
+        y: 843,
+        width: 833,
+        height: 843
+      },
+      action: {
+        type: "uri",
+        uri: `${MINI_APP_BASE_URL}/`
       }
     }
   ]
@@ -123,15 +128,10 @@ function generateRichMenuImage() {
   ctx.strokeStyle = '#ffffff';
   ctx.lineWidth = 6;
   
-  // 縦の区切り線（上段）
+  // 縦の区切り線（上段：2分割）
   ctx.beginPath();
-  ctx.moveTo(833, 0);
-  ctx.lineTo(833, 843);
-  ctx.stroke();
-  
-  ctx.beginPath();
-  ctx.moveTo(1667, 0);
-  ctx.lineTo(1667, 843);
+  ctx.moveTo(1250, 0);
+  ctx.lineTo(1250, 843);
   ctx.stroke();
 
   // 横の区切り線
@@ -140,23 +140,28 @@ function generateRichMenuImage() {
   ctx.lineTo(2500, 843);
   ctx.stroke();
 
-  // 縦の区切り線（下段）
+  // 縦の区切り線（下段：3分割）
   ctx.beginPath();
-  ctx.moveTo(1250, 843);
-  ctx.lineTo(1250, 1686);
+  ctx.moveTo(833, 843);
+  ctx.lineTo(833, 1686);
+  ctx.stroke();
+  
+  ctx.beginPath();
+  ctx.moveTo(1667, 843);
+  ctx.lineTo(1667, 1686);
   ctx.stroke();
 
   // 各エリアに背景色を追加
   ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
   
-  // 上段エリア（ホバー効果）
-  ctx.fillRect(10, 10, 813, 823);
-  ctx.fillRect(843, 10, 814, 823);
-  ctx.fillRect(1677, 10, 813, 823);
+  // 上段エリア（2分割）
+  ctx.fillRect(10, 10, 1230, 823);  // 左：出勤
+  ctx.fillRect(1260, 10, 1230, 823); // 右：退勤
   
-  // 下段エリア
-  ctx.fillRect(10, 853, 1230, 823);
-  ctx.fillRect(1260, 853, 1230, 823);
+  // 下段エリア（3分割）
+  ctx.fillRect(10, 853, 813, 823);   // 左：休憩開始
+  ctx.fillRect(843, 853, 814, 823);  // 中央：休憩終了
+  ctx.fillRect(1677, 853, 813, 823); // 右：ホーム
 
   // テキストを描画
   ctx.fillStyle = '#ffffff';
@@ -169,21 +174,26 @@ function generateRichMenuImage() {
 
   // 絵文字を描画
   ctx.font = 'bold 150px sans-serif';
-  ctx.fillText('🏢', 416, 320);
-  ctx.fillText('📊', 1250, 320);
-  ctx.fillText('🏠', 2084, 320);
-  ctx.fillText('⏰', 625, 1150);
-  ctx.fillText('🌅', 1875, 1150);
+  // 上段（2分割）
+  ctx.fillText('�', 625, 320);   // 出勤
+  ctx.fillText('🌆', 1875, 320);  // 退勤
+  
+  // 下段（3分割）
+  ctx.fillText('☕', 416, 1150);   // 休憩開始
+  ctx.fillText('💪', 1250, 1150); // 休憩終了
+  ctx.fillText('�', 2084, 1150);  // ホーム
 
   // テキストを描画
-  ctx.font = 'bold 65px sans-serif';
-  ctx.fillText('会社連携', 416, 500);
-  ctx.fillText('勤怠管理', 1250, 500);
-  ctx.fillText('ホーム', 2084, 500);
-
   ctx.font = 'bold 85px sans-serif';
-  ctx.fillText('出勤', 625, 1350);
-  ctx.fillText('退勤', 1875, 1350);
+  // 上段
+  ctx.fillText('出勤', 625, 500);
+  ctx.fillText('退勤', 1875, 500);
+
+  // 下段
+  ctx.font = 'bold 65px sans-serif';
+  ctx.fillText('休憩開始', 416, 1350);
+  ctx.fillText('休憩終了', 1250, 1350);
+  ctx.fillText('ホーム', 2084, 1350);
 
   // 影をリセット
   ctx.shadowColor = 'transparent';
@@ -278,11 +288,11 @@ async function createRichMenu() {
     console.log('💡 リッチメニューが表示されるまで数分かかる場合があります');
     console.log('');
     console.log('🔗 設定されたURL:');
-    console.log('- 会社連携:', `${MINI_APP_BASE_URL}/link`);
-    console.log('- 勤怠管理:', `${MINI_APP_BASE_URL}/attendance`);
-    console.log('- ホーム:', `${MINI_APP_BASE_URL}/`);
     console.log('- 出勤: 「出勤」メッセージを送信');
     console.log('- 退勤: 「退勤」メッセージを送信');
+    console.log('- 休憩開始: 「休憩開始」メッセージを送信');
+    console.log('- 休憩終了: 「休憩終了」メッセージを送信');
+    console.log('- ホーム:', `${MINI_APP_BASE_URL}/`);
     
   } catch (error) {
     console.error('❌ リッチメニュー作成エラー:', error.response?.data || error.message);

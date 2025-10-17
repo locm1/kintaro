@@ -66,7 +66,9 @@ async function recordAttendance(lineUserId: string, action: string) {
 
     // 勤怠記録の種別を確認
     const attendanceType = action === 'clock_in' ? 'clock_in' : 
-                          action === 'clock_out' ? 'clock_out' : null
+                          action === 'clock_out' ? 'clock_out' :
+                          action === 'break_start' ? 'break_start' :
+                          action === 'break_end' ? 'break_end' : null
 
     if (!attendanceType) {
       return {
@@ -115,6 +117,50 @@ async function recordAttendance(lineUserId: string, action: string) {
       }
     }
 
+    // 休憩開始の場合：出勤済みで休憩中でないかチェック
+    if (attendanceType === 'break_start') {
+      if (!latestRecord || latestRecord.length === 0 || !latestRecord[0]?.clock_in) {
+        return {
+          success: false,
+          error: '❌ 出勤記録がありません。\n先に出勤記録を行ってください。'
+        }
+      }
+      if (latestRecord[0].clock_out) {
+        return {
+          success: false,
+          error: '❌ すでに退勤済みです。'
+        }
+      }
+      if (latestRecord[0].break_start && !latestRecord[0].break_end) {
+        return {
+          success: false,
+          error: '❌ すでに休憩中です。'
+        }
+      }
+    }
+
+    // 休憩終了の場合：休憩中かチェック
+    if (attendanceType === 'break_end') {
+      if (!latestRecord || latestRecord.length === 0 || !latestRecord[0]?.break_start) {
+        return {
+          success: false,
+          error: '❌ 休憩開始記録がありません。\n先に休憩開始を行ってください。'
+        }
+      }
+      if (latestRecord[0].break_end) {
+        return {
+          success: false,
+          error: '❌ すでに休憩終了済みです。'
+        }
+      }
+      if (latestRecord[0].clock_out) {
+        return {
+          success: false,
+          error: '❌ すでに退勤済みです。'
+        }
+      }
+    }
+
     // 勤怠記録を保存
     let attendanceRecord
     if (attendanceType === 'clock_in') {
@@ -133,13 +179,39 @@ async function recordAttendance(lineUserId: string, action: string) {
 
       if (error) throw error
       attendanceRecord = data
-    } else {
+    } else if (attendanceType === 'clock_out') {
       // 既存の記録に退勤時刻を更新
       const { data, error } = await supabase
         .from('attendance_records')
         .update({
           clock_out: jstDate.toISOString(),
           status: 'present'
+        })
+        .eq('id', latestRecord![0].id)
+        .select('*')
+        .single()
+
+      if (error) throw error
+      attendanceRecord = data
+    } else if (attendanceType === 'break_start') {
+      // 既存の記録に休憩開始時刻を更新
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .update({
+          break_start: jstDate.toISOString()
+        })
+        .eq('id', latestRecord![0].id)
+        .select('*')
+        .single()
+
+      if (error) throw error
+      attendanceRecord = data
+    } else if (attendanceType === 'break_end') {
+      // 既存の記録に休憩終了時刻を更新
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .update({
+          break_end: jstDate.toISOString()
         })
         .eq('id', latestRecord![0].id)
         .select('*')
@@ -209,6 +281,16 @@ async function handleTextMessage(event: any) {
     return
   }
   
+  if (text === '休憩開始' || textLower === 'break start' || textLower === 'break_start') {
+    await quickAttendanceAction(event, 'break_start')
+    return
+  }
+  
+  if (text === '休憩終了' || textLower === 'break end' || textLower === 'break_end') {
+    await quickAttendanceAction(event, 'break_end')
+    return
+  }
+  
   // 簡単な応答例
   if (textLower.includes('こんにちは') || textLower.includes('hello')) {
     await replyMessage(replyToken, '勤怠太郎です！\n会社連携はこちらから行えます。', true)
@@ -217,9 +299,9 @@ async function handleTextMessage(event: any) {
       '🤖 勤怠太郎の使い方\n\n' +
       '1️⃣ 会社連携ボタンから会社と連携\n' +
       '2️⃣ 「出勤」「退勤」で勤怠記録\n' +
-      '3️⃣ 管理者は全社員の勤怠管理が可能\n\n' +
-      '「出勤」「退勤」とメッセージを送るか\n' +
-      'リッチメニューをご利用ください。', 
+      '3️⃣ 「休憩開始」「休憩終了」で休憩記録\n' +
+      '4️⃣ 管理者は全社員の勤怠管理が可能\n\n' +
+      'リッチメニューまたはメッセージで操作できます。', 
       true
     )
   }
@@ -305,7 +387,9 @@ async function quickAttendanceAction(event: any, action: string) {
     if (result.success) {
       const actionNames: { [key: string]: string } = {
         'clock_in': '出勤',
-        'clock_out': '退勤'
+        'clock_out': '退勤',
+        'break_start': '休憩開始',
+        'break_end': '休憩終了'
       }
       
       const actionName = actionNames[action] || action
