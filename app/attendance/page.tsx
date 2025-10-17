@@ -146,6 +146,10 @@ export default function AttendancePage() {
           setMessage('出勤記録がありません')
           return
         }
+        if (currentRecord?.clock_out) {
+          setMessage('すでに退勤済みです')
+          return
+        }
         if (currentRecord?.break_start && !currentRecord?.break_end) {
           setMessage('すでに休憩中です')
           return
@@ -154,6 +158,10 @@ export default function AttendancePage() {
       case 'break_end':
         if (!currentRecord?.break_start || currentRecord?.break_end) {
           setMessage('休憩開始記録がないか、すでに休憩終了済みです')
+          return
+        }
+        if (currentRecord?.clock_out) {
+          setMessage('すでに退勤済みです')
           return
         }
         break
@@ -473,10 +481,10 @@ export default function AttendancePage() {
 
           <button
             onClick={() => handleAttendanceAction('break_start')}
-            disabled={isLoading || !currentRecord?.clock_in || Boolean(currentRecord?.break_start && !currentRecord?.break_end)}
+            disabled={isLoading || !currentRecord?.clock_in || Boolean(currentRecord?.clock_out) || Boolean(currentRecord?.break_start && !currentRecord?.break_end)}
             className={clsx(
               "p-4 rounded-lg font-semibold transition",
-              (!currentRecord?.clock_in || (currentRecord?.break_start && !currentRecord?.break_end))
+              (!currentRecord?.clock_in || currentRecord?.clock_out || (currentRecord?.break_start && !currentRecord?.break_end))
                 ? "bg-gray-100 text-gray-500 cursor-not-allowed pointer-events-none"
                 : "bg-yellow-500 text-white hover:bg-yellow-600"
             )}
@@ -487,10 +495,10 @@ export default function AttendancePage() {
 
           <button
             onClick={() => handleAttendanceAction('break_end')}
-            disabled={isLoading || !currentRecord?.break_start || Boolean(currentRecord?.break_end)}
+            disabled={isLoading || !currentRecord?.break_start || Boolean(currentRecord?.break_end) || Boolean(currentRecord?.clock_out)}
             className={clsx(
               "p-4 rounded-lg font-semibold transition",
-              (!currentRecord?.break_start || currentRecord?.break_end)
+              (!currentRecord?.break_start || currentRecord?.break_end || currentRecord?.clock_out)
                 ? "bg-gray-100 text-gray-500 cursor-not-allowed pointer-events-none"
                 : "bg-blue-500 text-white hover:bg-blue-600"
             )}
