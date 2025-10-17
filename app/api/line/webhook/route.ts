@@ -195,18 +195,31 @@ export async function POST(request: NextRequest) {
 
 async function handleTextMessage(event: any) {
   const { replyToken, source, message } = event
-  const text = message.text.toLowerCase()
+  const text = message.text.trim()
+  const textLower = text.toLowerCase()
+  
+  // 勤怠記録のテキストメッセージ処理
+  if (text === '出勤' || textLower === 'clock in' || textLower === 'clock_in') {
+    await quickAttendanceAction(event, 'clock_in')
+    return
+  }
+  
+  if (text === '退勤' || textLower === 'clock out' || textLower === 'clock_out') {
+    await quickAttendanceAction(event, 'clock_out')
+    return
+  }
   
   // 簡単な応答例
-  if (text.includes('こんにちは') || text.includes('hello')) {
+  if (textLower.includes('こんにちは') || textLower.includes('hello')) {
     await replyMessage(replyToken, '勤怠太郎です！\n会社連携はこちらから行えます。', true)
-  } else if (text.includes('ヘルプ') || text.includes('help')) {
+  } else if (textLower.includes('ヘルプ') || textLower.includes('help')) {
     await replyMessage(replyToken, 
       '🤖 勤怠太郎の使い方\n\n' +
       '1️⃣ 会社連携ボタンから会社と連携\n' +
-      '2️⃣ 出勤・退勤ボタンで勤怠記録\n' +
+      '2️⃣ 「出勤」「退勤」で勤怠記録\n' +
       '3️⃣ 管理者は全社員の勤怠管理が可能\n\n' +
-      '詳しくはリッチメニューをご利用ください。', 
+      '「出勤」「退勤」とメッセージを送るか\n' +
+      'リッチメニューをご利用ください。', 
       true
     )
   }

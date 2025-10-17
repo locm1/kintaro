@@ -85,8 +85,8 @@ const richMenuData = {
         height: 843
       },
       action: {
-        type: "postback",
-        data: "action=clock_in"
+        type: "message",
+        text: "出勤"
       }
     },
     {
@@ -97,8 +97,8 @@ const richMenuData = {
         height: 843
       },
       action: {
-        type: "postback",
-        data: "action=clock_out"
+        type: "message",
+        text: "退勤"
       }
     }
   ]
@@ -281,8 +281,8 @@ async function createRichMenu() {
     console.log('- 会社連携:', `${MINI_APP_BASE_URL}/link`);
     console.log('- 勤怠管理:', `${MINI_APP_BASE_URL}/attendance`);
     console.log('- ホーム:', `${MINI_APP_BASE_URL}/`);
-    console.log('- 出勤:', `${MINI_APP_BASE_URL}/attendance?action=clock_in`);
-    console.log('- 退勤:', `${MINI_APP_BASE_URL}/attendance?action=clock_out`);
+    console.log('- 出勤: 「出勤」メッセージを送信');
+    console.log('- 退勤: 「退勤」メッセージを送信');
     
   } catch (error) {
     console.error('❌ リッチメニュー作成エラー:', error.response?.data || error.message);
