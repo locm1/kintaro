@@ -55,6 +55,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return
     }
     
+    // 開発環境での処理
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔧 Development mode: Using mock authentication')
+      // データベースに存在するユーザーIDを使用
+      const mockProfile = {
+        userId: 'Uda925faffcc7a7c3e29d546340aeef66',
+        displayName: 'Development User'
+      }
+      setUserProfile(mockProfile)
+      setIsAuthenticated(true)
+      setIsLoading(false)
+      setIsInitializing(false)
+      return
+    }
+    
     try {
       // URLパラメータでLIFFリダイレクトを検出
       const urlParams = new URLSearchParams(window.location.search)

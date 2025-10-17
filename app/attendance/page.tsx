@@ -50,21 +50,33 @@ export default function AttendancePage() {
 
   useEffect(() => {
     // 認証は AuthProvider で処理済み
+    console.log('🔄 useEffect triggered, userProfile:', userProfile)
     if (userProfile?.userId) {
+      console.log('👤 Loading records for user ID:', userProfile.userId)
       loadUserAndRecords(userProfile.userId)
     }
   }, [userProfile])
 
   const loadUserAndRecords = async (lineUserId: string) => {
     try {
+      console.log('🔍 Loading user with LINE ID:', lineUserId)
+      
       const response = await fetch(`/api/users?lineUserId=${lineUserId}`)
+      console.log('📡 API Response status:', response.status)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
       const data = await response.json()
+      console.log('📊 API Response data:', data)
       
       if (data.user) {
         setUser(data.user)
         await loadRecords(data.user.id, data.user.companyId)
       } else {
         setMessage('会社との連携が必要です')
+        console.log('❌ No user found in API response')
       }
     } catch (error) {
       console.error('Error loading user:', error)
