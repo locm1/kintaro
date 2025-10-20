@@ -42,7 +42,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // APIルートの場合は認証処理をスキップ
   useEffect(() => {
+    // LIFFライブラリのデバッグロガーを設定
     if (typeof window !== 'undefined') {
+      window.liffDebugLogger = addDebugLog
+      
       const pathname = window.location.pathname
       // APIパスの場合は認証処理を実行しない
       if (pathname.startsWith('/api/')) {
