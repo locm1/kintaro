@@ -78,8 +78,7 @@ async function recordAttendance(lineUserId: string, action: string) {
     }
 
     // 今日の日付を取得（UTC→JSTに変換）
-    const now = new Date()
-    const jstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000))
+    const jstDate = new Date()
     const todayStr = jstDate.toISOString().split('T')[0]
 
     // 今日の最新の勤怠記録を確認
