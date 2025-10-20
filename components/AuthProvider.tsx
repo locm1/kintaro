@@ -29,6 +29,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [userProfile, setUserProfile] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isInitializing, setIsInitializing] = useState(true)
+  const [debugLogs, setDebugLogs] = useState<string[]>([])
+  const [showDebug, setShowDebug] = useState(false)
+
+  // デバッグログ追加関数
+  const addDebugLog = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString()
+    const logMessage = `[${timestamp}] ${message}`
+    setDebugLogs(prev => [...prev.slice(-9), logMessage]) // 最新10件を保持
+    console.log(logMessage)
+  }
 
   // APIルートの場合は認証処理をスキップ
   useEffect(() => {
@@ -36,7 +46,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const pathname = window.location.pathname
       // APIパスの場合は認証処理を実行しない
       if (pathname.startsWith('/api/')) {
-        console.log('API path detected, skipping auth initialization')
+        addDebugLog('API path detected, skipping auth initialization')
         setIsLoading(false)
         setIsInitializing(false)
         setIsAuthenticated(true) // APIでは認証不要
@@ -48,16 +58,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [])
 
   const initializeAuth = async () => {
-    console.log('=== Starting global authentication ===')
+    addDebugLog('=== Starting global authentication ===')
+    addDebugLog(`Environment: ${process.env.NODE_ENV}`)
+    addDebugLog(`User Agent: ${typeof window !== 'undefined' ? window.navigator.userAgent : 'Server'}`)
     
     // クライアントサイドでのみ実行
     if (typeof window === 'undefined') {
+      addDebugLog('Server side detected, skipping auth')
       return
     }
     
-    // 開発環境での処理
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔧 Development mode: Using mock authentication')
+    // LINEアプリ内かどうかの判定
+    const isInLineApp = typeof window !== 'undefined' && 
+      (window.navigator.userAgent.includes('Line') || 
+       window.location.hostname.includes('line.me') ||
+       window.location.search.includes('liff'))
+    
+    addDebugLog(`Is in LINE app: ${isInLineApp}`)
+    
+    // 開発環境での処理（LINEアプリ外の場合）
+    if (process.env.NODE_ENV === 'development' && !isInLineApp) {
+      addDebugLog('🔧 Development mode: Using mock authentication')
       // データベースに存在するユーザーIDを使用
       const mockProfile = {
         userId: 'Uda925faffcc7a7c3e29d546340aeef66',
@@ -67,6 +88,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsAuthenticated(true)
       setIsLoading(false)
       setIsInitializing(false)
+      addDebugLog('✅ Development authentication completed')
       return
     }
     
@@ -75,26 +97,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const urlParams = new URLSearchParams(window.location.search)
       const hasLiffParams = urlParams.has('code') && urlParams.has('liffClientId')
       
+      addDebugLog(`URL parameters: ${window.location.search}`)
+      addDebugLog(`Has LIFF params: ${hasLiffParams}`)
+      
       if (hasLiffParams) {
-        console.log('LIFF redirect detected, processing...')
+        addDebugLog('LIFF redirect detected, processing...')
         setIsLoading(true)
         setIsInitializing(true)
       }
 
+      addDebugLog('Initializing LINE Mini App...')
       // LINE Mini App初期化
       const success = await initLineMiniApp()
       if (!success) {
-        console.error('Failed to initialize LINE Mini App')
+        addDebugLog('❌ Failed to initialize LINE Mini App')
         setIsLoading(false)
         setIsInitializing(false)
         return
       }
+      addDebugLog('✅ LINE Mini App initialized successfully')
 
       // 認証状態をチェック
       await checkAuthStatus(hasLiffParams)
       
     } catch (error) {
-      console.error('Error during auth initialization:', error)
+      addDebugLog(`❌ Error during auth initialization: ${error}`)
       setIsAuthenticated(false)
       setUserProfile(null)
       setIsLoading(false)
@@ -103,49 +130,58 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   const checkAuthStatus = async (isRedirect = false) => {
-    console.log('=== Checking authentication status ===')
+    addDebugLog('=== Checking authentication status ===')
     
     // リダイレクト後の場合は少し待機
     if (isRedirect) {
+      addDebugLog('Waiting 2 seconds after redirect...')
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
 
-    if (isUserLoggedIn()) {
-      console.log('User is authenticated, getting profile...')
-      const profile = await getLineMiniAppProfile()
-      
-      if (profile) {
-        console.log('Profile loaded:', profile.displayName)
-        setUserProfile(profile)
-        setIsAuthenticated(true)
+    try {
+      addDebugLog('Checking if user is logged in...')
+      if (isUserLoggedIn()) {
+        addDebugLog('✅ User is authenticated, getting profile...')
+        const profile = await getLineMiniAppProfile()
         
-        // リダイレクト後の場合URLをクリーンアップ
-        if (isRedirect && typeof window !== 'undefined') {
-          const cleanUrl = window.location.pathname
-          window.history.replaceState({}, document.title, cleanUrl)
+        if (profile) {
+          addDebugLog(`✅ Profile loaded: ${profile.displayName}`)
+          setUserProfile(profile)
+          setIsAuthenticated(true)
+          
+          // リダイレクト後の場合URLをクリーンアップ
+          if (isRedirect && typeof window !== 'undefined') {
+            const cleanUrl = window.location.pathname
+            window.history.replaceState({}, document.title, cleanUrl)
+            addDebugLog('URL cleaned up after redirect')
+          }
+        } else {
+          addDebugLog('❌ Failed to get profile')
+          setIsAuthenticated(false)
+          setUserProfile(null)
         }
       } else {
-        console.log('Failed to get profile')
+        addDebugLog('❌ User not authenticated, attempting automatic login...')
         setIsAuthenticated(false)
         setUserProfile(null)
+        
+        // 自動的にLINEログインを試行
+        try {
+          addDebugLog('🔄 Forcing LINE login...')
+          await forceLogin()
+          addDebugLog('Login redirect initiated')
+          return // forceLoginがリダイレクトするのでここで処理終了
+        } catch (error) {
+          addDebugLog(`❌ Auto-login failed: ${error}`)
+        }
       }
-    } else {
-      console.log('User not authenticated, attempting automatic login...')
-      setIsAuthenticated(false)
-      setUserProfile(null)
-      
-      // 自動的にLINEログインを試行
-      try {
-        console.log('Forcing LINE login...')
-        await forceLogin()
-        return // forceLoginがリダイレクトするのでここで処理終了
-      } catch (error) {
-        console.error('Auto-login failed:', error)
-      }
+    } catch (error) {
+      addDebugLog(`❌ Error in checkAuthStatus: ${error}`)
     }
     
     setIsLoading(false)
     setIsInitializing(false)
+    addDebugLog('Auth check completed')
   }
 
 
@@ -165,12 +201,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
     
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="text-center mb-6">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">
             {hasLiffParams ? 'ログイン処理中...' : 'LINE Mini App 初期化中...'}
           </p>
+        </div>
+        
+        {/* デバッグパネル */}
+        <div className="w-full max-w-md">
+          <button
+            onClick={() => setShowDebug(!showDebug)}
+            className="w-full bg-gray-600 text-white py-2 px-4 rounded-lg mb-2 text-sm"
+          >
+            {showDebug ? 'ログを隠す' : 'デバッグログを表示'} ({debugLogs.length})
+          </button>
+          
+          {showDebug && (
+            <div className="bg-black text-green-400 p-4 rounded-lg text-xs font-mono max-h-60 overflow-y-auto">
+              {debugLogs.length === 0 ? (
+                <div className="text-gray-500">ログはありません</div>
+              ) : (
+                debugLogs.map((log, index) => (
+                  <div key={index} className="mb-1 break-words">
+                    {log}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
     )
@@ -189,7 +249,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             <p className="text-gray-600 text-lg">LINE勤怠管理システム</p>
           </div>
 
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-white rounded-lg shadow-md p-6 mb-4">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
               <h3 className="text-lg font-semibold mb-4">LINEログイン処理中</h3>
@@ -197,6 +257,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 自動的にLINEログイン画面に移行します...
               </p>
             </div>
+          </div>
+
+          {/* デバッグパネル */}
+          <div className="w-full">
+            <button
+              onClick={() => setShowDebug(!showDebug)}
+              className="w-full bg-gray-600 text-white py-2 px-4 rounded-lg mb-2 text-sm"
+            >
+              {showDebug ? 'ログを隠す' : 'デバッグログを表示'} ({debugLogs.length})
+            </button>
+            
+            {showDebug && (
+              <div className="bg-black text-green-400 p-4 rounded-lg text-xs font-mono max-h-60 overflow-y-auto">
+                {debugLogs.length === 0 ? (
+                  <div className="text-gray-500">ログはありません</div>
+                ) : (
+                  debugLogs.map((log, index) => (
+                    <div key={index} className="mb-1 break-words">
+                      {log}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
