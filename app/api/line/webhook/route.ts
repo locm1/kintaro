@@ -77,8 +77,11 @@ async function recordAttendance(lineUserId: string, action: string) {
       }
     }
 
-    // 今日の日付を取得（UTC→JSTに変換）
-    const jstDate = new Date()
+    // 今日の日付を取得（JST）
+    const now = new Date()
+    // JST（UTC+9）での現在時刻を取得
+    const jstOffset = 9 * 60 * 60 * 1000 // 9時間をミリ秒に変換
+    const jstDate = new Date(now.getTime() + jstOffset)
     const todayStr = jstDate.toISOString().split('T')[0]
 
     // 今日の最新の勤怠記録を確認
@@ -160,6 +163,14 @@ async function recordAttendance(lineUserId: string, action: string) {
       }
     }
 
+    // JST時刻を+09:00形式のISO文字列で生成
+    const getJSTISOString = () => {
+      const now = new Date()
+      const jstOffset = 9 * 60 * 60 * 1000 // JST = UTC+9
+      const jstTime = new Date(now.getTime() + jstOffset)
+      return jstTime.toISOString().replace('Z', '+09:00')
+    }
+
     // 勤怠記録を保存
     let attendanceRecord
     if (attendanceType === 'clock_in') {
@@ -170,7 +181,7 @@ async function recordAttendance(lineUserId: string, action: string) {
           user_id: user.id,
           company_id: userCompany.company_id,
           date: todayStr,
-          clock_in: jstDate.toISOString(),
+          clock_in: getJSTISOString(),
           status: 'present'
         })
         .select('*')
@@ -183,7 +194,7 @@ async function recordAttendance(lineUserId: string, action: string) {
       const { data, error } = await supabase
         .from('attendance_records')
         .update({
-          clock_out: jstDate.toISOString(),
+          clock_out: getJSTISOString(),
           status: 'present'
         })
         .eq('id', latestRecord![0].id)
@@ -197,7 +208,7 @@ async function recordAttendance(lineUserId: string, action: string) {
       const { data, error } = await supabase
         .from('attendance_records')
         .update({
-          break_start: jstDate.toISOString()
+          break_start: getJSTISOString()
         })
         .eq('id', latestRecord![0].id)
         .select('*')
@@ -210,7 +221,7 @@ async function recordAttendance(lineUserId: string, action: string) {
       const { data, error } = await supabase
         .from('attendance_records')
         .update({
-          break_end: jstDate.toISOString()
+          break_end: getJSTISOString()
         })
         .eq('id', latestRecord![0].id)
         .select('*')
@@ -393,6 +404,7 @@ async function quickAttendanceAction(event: any, action: string) {
       
       const actionName = actionNames[action] || action
       const timestamp = new Date().toLocaleString('ja-JP', {
+        timeZone: 'Asia/Tokyo',
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
