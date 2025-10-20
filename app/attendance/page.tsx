@@ -433,7 +433,7 @@ export default function AttendancePage() {
           <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <Clock className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">勤怠太郎</h1>
+          <h1 className="text-2xl font-bold text-gray-800">勤太郎</h1>
           <p className="text-gray-600">{user.company.name}</p>
           {user.isAdmin && (
             <span className="inline-block bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full mt-1">

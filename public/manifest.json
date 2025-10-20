@@ -1,6 +1,6 @@
 {
-  "name": "勤怠太郎",
-  "short_name": "勤怠太郎",
+  "name": "勤太郎",
+  "short_name": "勤太郎",
   "description": "LINE勤怠管理システム",
   "start_url": "/",
   "display": "standalone",

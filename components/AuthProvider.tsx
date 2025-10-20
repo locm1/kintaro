@@ -248,7 +248,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             <div className="w-24 h-24 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
               <Building2 className="w-12 h-12 text-white" />
             </div>
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">勤怠太郎</h1>
+            <h1 className="text-4xl font-bold text-gray-800 mb-2">勤太郎</h1>
             <p className="text-gray-600 text-lg">LINE勤怠管理システム</p>
           </div>
 

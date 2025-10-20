@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "勤怠太郎 - LINE勤怠管理システム",
+  title: "勤太郎 - LINE勤怠管理システム",
   description: "LINEミニアプリで簡単勤怠管理",
 };
 

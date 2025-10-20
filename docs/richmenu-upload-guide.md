@@ -10,7 +10,7 @@
 ### 1. LINE Developersコンソールにアクセス
 1. [LINE Developers Console](https://developers.line.biz/console/) にアクセス
 2. プロバイダーを選択
-3. 「勤怠太郎」チャネルを選択
+3. 「勤太郎」チャネルを選択
 
 ### 2. リッチメニューページへ移動
 1. 左メニューから「リッチメニュー」を選択

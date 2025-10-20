@@ -303,10 +303,10 @@ async function handleTextMessage(event: any) {
   
   // 簡単な応答例
   if (textLower.includes('こんにちは') || textLower.includes('hello')) {
-    await replyMessage(replyToken, '勤怠太郎です！\n会社連携はこちらから行えます。', true)
+    await replyMessage(replyToken, '勤太郎です！\n会社連携はこちらから行えます。', true)
   } else if (textLower.includes('ヘルプ') || textLower.includes('help')) {
     await replyMessage(replyToken, 
-      '🤖 勤怠太郎の使い方\n\n' +
+      '🤖 勤太郎の使い方\n\n' +
       '1️⃣ 会社連携ボタンから会社と連携\n' +
       '2️⃣ 「出勤」「退勤」で勤怠記録\n' +
       '3️⃣ 「休憩開始」「休憩終了」で休憩記録\n' +
@@ -330,7 +330,7 @@ async function handlePostback(event: any) {
       break
     case 'action=help':
       await replyMessage(replyToken, 
-        '🤖 勤怠太郎の使い方\n\n' +
+        '🤖 勤太郎の使い方\n\n' +
         '📋 会社連携: 勤務先の会社と連携\n' +
         '⏰ 勤怠管理: 出勤・退勤・休憩の記録\n' +
         '📊 履歴確認: 過去の勤怠データを表示\n\n' +
@@ -432,7 +432,7 @@ async function handleFollow(event: any) {
   const { replyToken } = event
   
   await replyMessage(replyToken,
-    '勤怠太郎をご利用いただき、ありがとうございます！\n\n' +
+    '勤太郎をご利用いただき、ありがとうございます！\n\n' +
     '📋 まずは会社連携から始めましょう\n' +
     '⏰ 出勤・退勤の記録が簡単にできます\n' +
     '👥 管理者機能もご利用いただけます\n\n' +

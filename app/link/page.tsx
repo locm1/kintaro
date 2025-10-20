@@ -165,7 +165,7 @@ export default function CompanyLinkPage() {
             <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <Building2 className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-800">勤怠太郎</h1>
+            <h1 className="text-2xl font-bold text-gray-800">勤太郎</h1>
             <p className="text-gray-600 mt-2">会社連携</p>
           </div>
 
@@ -207,7 +207,7 @@ export default function CompanyLinkPage() {
           <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <Building2 className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">勤怠太郎</h1>
+          <h1 className="text-2xl font-bold text-gray-800">勤太郎</h1>
           <p className="text-gray-600 mt-2">会社連携</p>
         </div>
 

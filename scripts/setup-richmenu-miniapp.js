@@ -38,7 +38,7 @@ const richMenuData = {
     height: 1686
   },
   selected: true,
-  name: "勤怠太郎ミニアプリメニュー",
+  name: "勤太郎ミニアプリメニュー",
   chatBarText: "メニュー",
   areas: [
     // 上段左：出勤
