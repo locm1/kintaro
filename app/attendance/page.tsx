@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, Coffee, FileText, Users, Edit3 } from 'lucide-react'
+import { Clock, Coffee, FileText, Users, Edit3, Download, Calendar } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useAuth } from '@/components/AuthProvider'
 
@@ -43,6 +43,11 @@ export default function AttendancePage() {
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null)
   const [users, setUsers] = useState<User[]>([])
   const [showRecords, setShowRecords] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportDateRange, setExportDateRange] = useState({
+    startDate: '',
+    endDate: ''
+  })
   const [editForm, setEditForm] = useState({
     clockIn: '',
     clockOut: '',
@@ -239,6 +244,48 @@ export default function AttendancePage() {
       setMessage('エラーが発生しました')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleExportCSV = async () => {
+    if (!user || !user.isAdmin) return
+
+    setIsExporting(true)
+    try {
+      const params = new URLSearchParams({
+        userId: user.id,
+        companyId: user.companyId
+      })
+
+      if (exportDateRange.startDate) {
+        params.append('startDate', exportDateRange.startDate)
+      }
+      if (exportDateRange.endDate) {
+        params.append('endDate', exportDateRange.endDate)
+      }
+
+      const response = await fetch(`/api/attendance/export?${params.toString()}`)
+      
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `attendance_records_${new Date().toLocaleDateString('ja-JP').replace(/\//g, '-')}.csv`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        setMessage('CSVファイルをダウンロードしました')
+      } else {
+        const errorData = await response.json()
+        setMessage(errorData.error || 'エクスポートに失敗しました')
+      }
+    } catch (error) {
+      console.error('Export error:', error)
+      setMessage('エクスポート中にエラーが発生しました')
+    } finally {
+      setIsExporting(false)
     }
   }
 
@@ -518,16 +565,76 @@ export default function AttendancePage() {
           </button>
 
           {user.isAdmin && (
-            <button
-              onClick={() => {
-                setShowRecords(true)
-                loadRecords(user.id, user.companyId)
-              }}
-              className="w-full bg-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-purple-700 transition flex items-center justify-center"
-            >
-              <Users className="w-5 h-5 mr-2" />
-              全社員の勤怠管理
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  setShowRecords(true)
+                  loadRecords(user.id, user.companyId)
+                }}
+                className="w-full bg-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-purple-700 transition flex items-center justify-center"
+              >
+                <Users className="w-5 h-5 mr-2" />
+                全社員の勤怠管理
+              </button>
+              
+              <div className="bg-white rounded-lg shadow-md p-4">
+                <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+                  <Download className="w-5 h-5 mr-2" />
+                  CSVエクスポート
+                </h3>
+                
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        開始日
+                      </label>
+                      <input
+                        type="date"
+                        value={exportDateRange.startDate}
+                        onChange={(e) => setExportDateRange(prev => ({
+                          ...prev,
+                          startDate: e.target.value
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        終了日
+                      </label>
+                      <input
+                        type="date"
+                        value={exportDateRange.endDate}
+                        onChange={(e) => setExportDateRange(prev => ({
+                          ...prev,
+                          endDate: e.target.value
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                      />
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={handleExportCSV}
+                    disabled={isExporting}
+                    className="w-full bg-green-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-700 transition flex items-center justify-center disabled:opacity-50"
+                  >
+                    {isExporting ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    ) : (
+                      <Download className="w-4 h-4 mr-2" />
+                    )}
+                    {isExporting ? 'エクスポート中...' : '勤怠データをダウンロード'}
+                  </button>
+                  
+                  <p className="text-xs text-gray-500">
+                    ※ 日付を指定しない場合は全期間のデータをエクスポートします
+                  </p>
+                </div>
+              </div>
+            </>
           )}
         </div>
 
