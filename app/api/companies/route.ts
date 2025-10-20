@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, lineUserId } = await request.json()
+    const { name, lineUserId, displayName } = await request.json()
 
     // 会社コードを生成（簡単な実装）
     const code = Math.random().toString(36).substring(2, 10).toUpperCase()
@@ -24,11 +24,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create company' }, { status: 500 })
     }
 
-    // usersテーブルに管理者ユーザーを作成
+    // usersテーブルに管理者ユーザーを作成（LINEのニックネームをnameに設定）
     const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .insert({
-        line_user_id: lineUserId
+        line_user_id: lineUserId,
+        name: displayName || null // LINEのニックネームをnameフィールドに挿入
       })
       .select()
       .single()

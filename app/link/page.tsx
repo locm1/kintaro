@@ -97,7 +97,8 @@ export default function CompanyLinkPage() {
         },
         body: JSON.stringify({
           companyCode: companyCode.trim().toUpperCase(),
-          lineUserId: userProfile?.userId
+          lineUserId: userProfile?.userId,
+          displayName: userProfile?.displayName
         }),
       })
 
@@ -131,7 +132,8 @@ export default function CompanyLinkPage() {
         },
         body: JSON.stringify({
           name: newCompanyName.trim(),
-          lineUserId: userProfile?.userId
+          lineUserId: userProfile?.userId,
+          displayName: userProfile?.displayName
         }),
       })
 

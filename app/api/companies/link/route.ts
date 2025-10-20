@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(request: NextRequest) {
   try {
-    const { companyCode, lineUserId } = await request.json()
+    const { companyCode, lineUserId, displayName } = await request.json()
 
     // 会社コードで会社を検索
     const { data: companies, error: companyError } = await supabaseAdmin
@@ -48,11 +48,28 @@ export async function POST(request: NextRequest) {
     let user
     if (existingUsers && existingUsers.length > 0) {
       user = existingUsers[0]
+      
+      // 既存ユーザーのnameが空でdisplayNameがある場合は更新
+      if (displayName) {
+        const { data: userData } = await supabaseAdmin
+          .from('users')
+          .select('name')
+          .eq('id', user.id)
+          .single()
+        
+        if (userData && !userData.name) {
+          await supabaseAdmin
+            .from('users')
+            .update({ name: displayName })
+            .eq('id', user.id)
+        }
+      }
     } else {
       const { data: newUser, error: userError } = await supabaseAdmin
         .from('users')
         .insert({
-          line_user_id: lineUserId
+          line_user_id: lineUserId,
+          name: displayName || null // LINEのニックネームをnameフィールドに挿入
         })
         .select()
         .single()
