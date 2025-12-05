@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { Building2, Users, Clock, Copy, CheckCircle } from 'lucide-react'
-import Link from 'next/link'
 import { useAuth } from '@/components/AuthProvider'
+import { useSPA } from '@/components/SPAContext'
 
 interface User {
   id: string
@@ -29,8 +29,9 @@ interface AttendanceRecord {
   status: string
 }
 
-export default function SettingPage() {
+export default function SettingsContent() {
   const { userProfile } = useAuth()
+  const { navigate } = useSPA()
   const [user, setUser] = useState<User | null>(null)
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null)
   const [attendanceStatus, setAttendanceStatus] = useState<string>('未出勤')
@@ -327,12 +328,12 @@ export default function SettingPage() {
             <p className="text-gray-600 mb-4">
               {user ? '会社情報の確認・変更ができます' : 'まずは勤務先の会社と連携しましょう'}
             </p>
-            <Link
-              href="/link"
+            <button
+              onClick={() => navigate('/link')}
               className="inline-block bg-blue-600 text-white py-2 px-6 rounded-lg font-semibold hover:bg-blue-700 transition"
             >
               {user ? '会社設定' : '会社連携を開始'}
-            </Link>
+            </button>
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-6 text-center">
@@ -341,12 +342,12 @@ export default function SettingPage() {
             <p className="text-gray-600 mb-4">
               出勤・退勤・休憩の記録ができます
             </p>
-            <Link
-              href="/"
+            <button
+              onClick={() => navigate('/')}
               className="inline-block bg-green-600 text-white py-2 px-6 rounded-lg font-semibold hover:bg-green-700 transition"
             >
               勤怠記録へ
-            </Link>
+            </button>
           </div>
 
           {userProfile && (

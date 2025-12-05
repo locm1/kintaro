@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { ClipboardList, CheckCircle, XCircle, Clock, AlertCircle, User, Calendar, MessageSquare } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
-import Link from 'next/link'
+import { useSPA } from '@/components/SPAContext'
 
 interface UserData {
   id: string
@@ -38,8 +38,9 @@ interface ChangeRequest {
   }
 }
 
-export default function RequestsPage() {
+export default function RequestsContent() {
   const { isAuthenticated, userProfile, isLoading: authLoading } = useAuth()
+  const { navigate } = useSPA()
   const [user, setUser] = useState<UserData | null>(null)
   const [isPageLoading, setIsPageLoading] = useState(true)
   const [requests, setRequests] = useState<ChangeRequest[]>([])
@@ -204,9 +205,9 @@ export default function RequestsPage() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="bg-white rounded-lg shadow-md p-6 text-center">
           <p className="text-gray-600 mb-4">ログインが必要です</p>
-          <Link href="/attendance" className="bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition">
+          <button onClick={() => navigate('/')} className="bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition">
             勤怠ページへ
-          </Link>
+          </button>
         </div>
       </div>
     )
@@ -217,9 +218,9 @@ export default function RequestsPage() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="bg-white rounded-lg shadow-md p-6 text-center">
           <p className="text-gray-600 mb-4">このページは管理者のみアクセスできます</p>
-          <Link href="/attendance" className="bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition">
+          <button onClick={() => navigate('/')} className="bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition">
             勤怠ページへ
-          </Link>
+          </button>
         </div>
       </div>
     )
@@ -240,9 +241,9 @@ export default function RequestsPage() {
                 </span>
               )}
             </div>
-            <Link href="/attendance" className="text-blue-600 hover:text-blue-800 text-sm">
+            <button onClick={() => navigate('/')} className="text-blue-600 hover:text-blue-800 text-sm">
               ← 戻る
-            </Link>
+            </button>
           </div>
           
           <p className="text-sm text-gray-600 mb-4">{user.company.name}</p>

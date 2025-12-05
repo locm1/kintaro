@@ -2,17 +2,21 @@
 
 import { useState, useEffect } from 'react'
 import { Clock, Coffee, ClipboardList } from 'lucide-react'
-import { clsx } from 'clsx'
+import clsx from 'clsx'
 import { useAuth } from '@/components/AuthProvider'
-import Link from 'next/link'
+import { useSPA } from '@/components/SPAContext'
 
 interface User {
   id: string
+  name: string
+  email: string
+  lineUserId: string
   companyId: string
   isAdmin: boolean
   company: {
     id: string
     name: string
+    code: string
   }
 }
 
@@ -24,87 +28,47 @@ interface AttendanceRecord {
   break_start: string | null
   break_end: string | null
   status: string
-  user_companies?: {
-    users?: {
-      email: string
-    }
-  }
 }
 
-export default function Home() {
-  const { isAuthenticated, userProfile, isLoading: authLoading } = useAuth()
+export default function HomeContent() {
+  const { userProfile, isAuthenticated, isLoading: authLoading } = useAuth()
+  const { navigate } = useSPA()
   const [user, setUser] = useState<User | null>(null)
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([])
-  const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isPageLoading, setIsPageLoading] = useState(true) // ページ全体のローディング状態
+  const [isPageLoading, setIsPageLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState('')
 
-
   useEffect(() => {
-    // 認証は AuthProvider で処理済み
-    console.log('🔄 useEffect triggered, userProfile:', userProfile)
     if (userProfile?.userId) {
-      console.log('👤 Loading records for user ID:', userProfile.userId)
       loadUserAndRecords(userProfile.userId)
     } else if (!authLoading) {
-      // 認証が完了しているがuserProfileがない場合
       setIsPageLoading(false)
     }
   }, [userProfile, authLoading])
 
   const loadUserAndRecords = async (lineUserId: string) => {
     try {
-      setIsLoading(true)
       setIsPageLoading(true)
-      console.log('🔍 Loading user with LINE ID:', lineUserId)
-      
-      const response = await fetch(`/api/users?lineUserId=${lineUserId}`)
-      console.log('📡 API Response status:', response.status)
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      
-      const data = await response.json()
-      console.log('📊 API Response data:', data)
-      
-      if (data.user) {
-        setUser(data.user)
-        await loadRecords(data.user.id, data.user.companyId)
-      } else {
-        setMessage('会社との連携が必要です')
-        console.log('❌ No user found in API response')
+      const userResponse = await fetch(`/api/users?lineUserId=${lineUserId}`)
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        if (userData.user) {
+          setUser(userData.user)
+          await loadRecords(userData.user.id, userData.user.companyId)
+        }
       }
     } catch (error) {
       console.error('Error loading user:', error)
-      setMessage('ユーザー情報の取得に失敗しました')
     } finally {
-      setIsLoading(false)
       setIsPageLoading(false)
-    }
-  }
-
-  const loadUser = async (lineUserId: string) => {
-    try {
-      const response = await fetch(`/api/users?lineUserId=${lineUserId}`)
-      const data = await response.json()
-      
-      if (data.user) {
-        setUser(data.user)
-        await loadRecords(data.user.id, data.user.companyId)
-      } else {
-        setMessage('会社との連携が必要です')
-      }
-    } catch (error) {
-      console.error('Error loading user:', error)
-      setMessage('ユーザー情報の取得に失敗しました')
     }
   }
 
   const loadRecords = async (userId: string, companyId: string) => {
     try {
-      const response = await fetch(`/api/attendance?userId=${userId}&companyId=${companyId}`)
+      const today = new Date().toISOString().split('T')[0]
+      const response = await fetch(`/api/attendance?userId=${userId}&companyId=${companyId}&date=${today}`)
       const data = await response.json()
       setAttendanceRecords(data.records || [])
     } catch (error) {
@@ -112,77 +76,39 @@ export default function Home() {
     }
   }
 
-
-
-  const handleAttendanceAction = async (action: string) => {
+  const handleAttendanceAction = async (action: 'clock_in' | 'clock_out' | 'break_start' | 'break_end') => {
     if (!user) return
-
-    // 現在の記録を取得
-    const currentRecord = getTodayRecord()
     
-    // アクション別のガード処理
-    switch (action) {
-      case 'clock_in':
-        if (currentRecord?.clock_in) {
-          setMessage('すでに出勤済みです')
-          return
-        }
-        break
-      case 'clock_out':
-        if (!currentRecord?.clock_in || currentRecord?.clock_out) {
-          setMessage('出勤記録がないか、すでに退勤済みです')
-          return
-        }
-        break
-      case 'break_start':
-        if (!currentRecord?.clock_in) {
-          setMessage('出勤記録がありません')
-          return
-        }
-        if (currentRecord?.clock_out) {
-          setMessage('すでに退勤済みです')
-          return
-        }
-        if (currentRecord?.break_start && !currentRecord?.break_end) {
-          setMessage('すでに休憩中です')
-          return
-        }
-        break
-      case 'break_end':
-        if (!currentRecord?.break_start || currentRecord?.break_end) {
-          setMessage('休憩開始記録がないか、すでに休憩終了済みです')
-          return
-        }
-        if (currentRecord?.clock_out) {
-          setMessage('すでに退勤済みです')
-          return
-        }
-        break
-    }
-
     setIsLoading(true)
+    setMessage('')
+    
     try {
       const response = await fetch('/api/attendance', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.id,
           companyId: user.companyId,
           action
-        }),
+        })
       })
-
+      
       const data = await response.json()
       
       if (response.ok) {
-        setMessage(data.message)
+        const actionMessages: { [key: string]: string } = {
+          clock_in: '出勤を記録しました',
+          clock_out: '退勤を記録しました',
+          break_start: '休憩開始を記録しました',
+          break_end: '休憩終了を記録しました'
+        }
+        setMessage(actionMessages[action])
         await loadRecords(user.id, user.companyId)
       } else {
         setMessage(data.error || 'エラーが発生しました')
       }
     } catch (error) {
+      console.error('Error:', error)
       setMessage('エラーが発生しました')
     } finally {
       setIsLoading(false)
@@ -191,10 +117,15 @@ export default function Home() {
 
   const formatTime = (timeString: string | null) => {
     if (!timeString) return '-'
-    return new Date(timeString).toLocaleTimeString('ja-JP', {
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+    try {
+      return new Date(timeString).toLocaleTimeString('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch {
+      return '-'
+    }
   }
 
   const getTodayRecord = () => {
@@ -229,12 +160,12 @@ export default function Home() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="bg-white rounded-lg shadow-md p-6 text-center">
           <p className="text-gray-600 mb-4">会社との連携が必要です</p>
-          <a 
-            href="/link" 
+          <button 
+            onClick={() => navigate('/link')}
             className="bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition"
           >
             会社連携画面へ
-          </a>
+          </button>
         </div>
       </div>
     )
@@ -242,12 +173,10 @@ export default function Home() {
 
   const currentRecord = getTodayRecord()
 
-  // ローディング状態のレンダリング
   if (authLoading || isPageLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="max-w-md mx-auto">
-          {/* プロフィールカードのスケルトン */}
           <div className="bg-white rounded-lg shadow-md p-4 mb-6">
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 bg-gray-200 rounded-full animate-pulse"></div>
@@ -258,7 +187,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* ボタンエリアのスケルトン */}
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="h-20 bg-gray-200 rounded-lg animate-pulse"></div>
             <div className="h-20 bg-gray-200 rounded-lg animate-pulse"></div>
@@ -266,7 +194,6 @@ export default function Home() {
             <div className="h-20 bg-gray-200 rounded-lg animate-pulse"></div>
           </div>
 
-          {/* 今日の記録カードのスケルトン */}
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
             <div className="h-6 bg-gray-200 rounded w-32 mb-4 animate-pulse"></div>
             <div className="space-y-3">
@@ -281,7 +208,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 管理者エリアのスケルトン */}
           <div className="space-y-4">
             <div className="h-12 bg-gray-200 rounded-lg animate-pulse"></div>
             <div className="h-12 bg-gray-200 rounded-lg animate-pulse"></div>
@@ -291,18 +217,17 @@ export default function Home() {
     )
   }
 
-  // userがnullかつページロードが完了している場合のみ「会社との連携が必要です」を表示
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="bg-white rounded-lg shadow-md p-6 text-center">
           <p className="text-gray-600 mb-4">会社との連携が必要です</p>
-          <a 
-            href="/link" 
+          <button 
+            onClick={() => navigate('/link')}
             className="bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition"
           >
             会社連携画面へ
-          </a>
+          </button>
         </div>
       </div>
     )
@@ -432,13 +357,13 @@ export default function Home() {
 
         {user.isAdmin && (
           <div className="space-y-3">
-            <Link
-              href="/requests"
+            <button
+              onClick={() => navigate('/requests')}
               className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-orange-700 transition flex items-center justify-center"
             >
               <ClipboardList className="w-5 h-5 mr-2" />
               変更リクエスト管理
-            </Link>
+            </button>
           </div>
         )}
       </div>

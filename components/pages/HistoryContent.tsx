@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Clock, Coffee, ChevronLeft, ChevronRight, Send, X, CheckCircle, XCircle, AlertCircle, Users, Edit3, Share2, Copy, Check, ExternalLink, Trash2 } from 'lucide-react'
+import { Calendar, Clock, Coffee, Send, X, CheckCircle, XCircle, AlertCircle, Users, Edit3, Share2, Copy, Check, ExternalLink, Trash2 } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
-import Link from 'next/link'
+import { useSPA } from '@/components/SPAContext'
 
 interface User {
   id: string
@@ -45,8 +45,9 @@ interface CompanyUser {
   email: string | null
 }
 
-export default function HistoryPage() {
+export default function HistoryContent() {
   const { isAuthenticated, userProfile, isLoading: authLoading } = useAuth()
+  const { navigate } = useSPA()
   const [user, setUser] = useState<User | null>(null)
   const [isPageLoading, setIsPageLoading] = useState(true)
   const [records, setRecords] = useState<AttendanceRecord[]>([])
@@ -553,9 +554,9 @@ export default function HistoryPage() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="bg-white rounded-lg shadow-md p-6 text-center">
           <p className="text-gray-600 mb-4">ログインが必要です</p>
-          <Link href="/attendance" className="bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition">
+          <button onClick={() => navigate('/')} className="bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition">
             勤怠ページへ
-          </Link>
+          </button>
         </div>
       </div>
     )
