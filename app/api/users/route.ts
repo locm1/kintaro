@@ -5,6 +5,40 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const lineUserId = searchParams.get('lineUserId')
+    const companyId = searchParams.get('companyId')
+    const listAll = searchParams.get('listAll') === 'true'
+
+    // 会社の全ユーザーを取得（管理者用）
+    if (companyId && listAll) {
+      const { data: userCompanies, error } = await supabaseAdmin
+        .from('user_companies')
+        .select(`
+          user_id,
+          is_admin,
+          users (
+            id,
+            name,
+            email,
+            line_user_id
+          )
+        `)
+        .eq('company_id', companyId)
+
+      if (error) {
+        console.error('Error fetching company users:', error)
+        return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
+      }
+
+      const users = userCompanies?.map(uc => ({
+        id: uc.users?.id,
+        name: uc.users?.name,
+        email: uc.users?.email,
+        lineUserId: uc.users?.line_user_id,
+        isAdmin: uc.is_admin
+      })).filter(u => u.id) || []
+
+      return NextResponse.json({ users })
+    }
 
     console.log('🔍 API: Looking for user with LINE ID:', lineUserId)
 

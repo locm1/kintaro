@@ -128,6 +128,38 @@ export interface Database {
           updated_at?: string
         }
       }
+      attendance_shares: {
+        Row: {
+          id: string
+          user_id: string
+          company_id: string
+          token: string
+          year_month: string
+          expires_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          company_id: string
+          token: string
+          year_month: string
+          expires_at: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          company_id?: string
+          token?: string
+          year_month?: string
+          expires_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

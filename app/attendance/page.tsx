@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, Coffee, FileText, Users, Edit3, Download, Calendar } from 'lucide-react'
+import { Clock, Coffee, FileText, Users, Edit3, Download, Calendar, Share2, Copy, Check, ExternalLink, Trash2 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useAuth } from '@/components/AuthProvider'
 
@@ -54,6 +54,28 @@ export default function AttendancePage() {
     breakStart: '',
     breakEnd: ''
   })
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [shareMonth, setShareMonth] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`
+  })
+  const [isCreatingShare, setIsCreatingShare] = useState(false)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false)
+  const [existingShares, setExistingShares] = useState<any[]>([])
+  const [isLoadingShares, setIsLoadingShares] = useState(false)
+  // 管理者用：社員共有リンク管理
+  const [showAdminShareModal, setShowAdminShareModal] = useState(false)
+  const [companyUsers, setCompanyUsers] = useState<any[]>([])
+  const [selectedUserId, setSelectedUserId] = useState<string>('')
+  const [adminShareMonth, setAdminShareMonth] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`
+  })
+  const [allCompanyShares, setAllCompanyShares] = useState<any[]>([])
+  const [isLoadingCompanyUsers, setIsLoadingCompanyUsers] = useState(false)
+  const [adminShareUrl, setAdminShareUrl] = useState<string | null>(null)
+  const [adminCopiedToClipboard, setAdminCopiedToClipboard] = useState(false)
 
   useEffect(() => {
     // 認証は AuthProvider で処理済み
@@ -123,6 +145,185 @@ export default function AttendancePage() {
       setAttendanceRecords(data.records || [])
     } catch (error) {
       console.error('Error loading records:', error)
+    }
+  }
+
+  const loadExistingShares = async () => {
+    if (!user) return
+    setIsLoadingShares(true)
+    try {
+      const response = await fetch(`/api/attendance/share?userId=${user.id}&companyId=${user.companyId}`)
+      const data = await response.json()
+      setExistingShares(data.shares || [])
+    } catch (error) {
+      console.error('Error loading shares:', error)
+    } finally {
+      setIsLoadingShares(false)
+    }
+  }
+
+  const handleCreateShareLink = async () => {
+    if (!user) return
+    setIsCreatingShare(true)
+    setShareUrl(null)
+    setCopiedToClipboard(false)
+    try {
+      const response = await fetch('/api/attendance/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          companyId: user.companyId,
+          yearMonth: shareMonth,
+          expiresInDays: 30
+        })
+      })
+      const data = await response.json()
+      if (response.ok) {
+        const url = `${window.location.origin}/share/${data.share.token}`
+        setShareUrl(url)
+        setMessage('共有リンクを作成しました')
+        loadExistingShares()
+      } else {
+        setMessage(data.error || '共有リンクの作成に失敗しました')
+      }
+    } catch (error) {
+      console.error('Error creating share link:', error)
+      setMessage('共有リンクの作成に失敗しました')
+    } finally {
+      setIsCreatingShare(false)
+    }
+  }
+
+  const handleCopyShareUrl = async () => {
+    if (!shareUrl) return
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopiedToClipboard(true)
+      setTimeout(() => setCopiedToClipboard(false), 2000)
+    } catch (error) {
+      console.error('Error copying to clipboard:', error)
+    }
+  }
+
+  const handleDeleteShare = async (shareId: string) => {
+    if (!user) return
+    try {
+      const response = await fetch(`/api/attendance/share?shareId=${shareId}&userId=${user.id}`, {
+        method: 'DELETE'
+      })
+      if (response.ok) {
+        setMessage('共有リンクを削除しました')
+        loadExistingShares()
+      } else {
+        const data = await response.json()
+        setMessage(data.error || '削除に失敗しました')
+      }
+    } catch (error) {
+      console.error('Error deleting share:', error)
+      setMessage('削除に失敗しました')
+    }
+  }
+
+  const formatYearMonth = (yearMonth: string) => {
+    const [year, month] = yearMonth.split('-')
+    return `${year}年${parseInt(month)}月`
+  }
+
+  // 管理者用：会社の全ユーザーを取得
+  const loadCompanyUsers = async () => {
+    if (!user || !user.isAdmin) return
+    setIsLoadingCompanyUsers(true)
+    try {
+      const response = await fetch(`/api/users?companyId=${user.companyId}&listAll=true`)
+      const data = await response.json()
+      setCompanyUsers(data.users || [])
+    } catch (error) {
+      console.error('Error loading company users:', error)
+    } finally {
+      setIsLoadingCompanyUsers(false)
+    }
+  }
+
+  // 管理者用：全社員の共有リンクを取得
+  const loadAllCompanyShares = async () => {
+    if (!user || !user.isAdmin) return
+    setIsLoadingShares(true)
+    try {
+      const response = await fetch(`/api/attendance/share?userId=${user.id}&companyId=${user.companyId}&allUsers=true`)
+      const data = await response.json()
+      setAllCompanyShares(data.shares || [])
+    } catch (error) {
+      console.error('Error loading company shares:', error)
+    } finally {
+      setIsLoadingShares(false)
+    }
+  }
+
+  // 管理者用：社員の共有リンクを作成
+  const handleCreateAdminShareLink = async () => {
+    if (!user || !selectedUserId) return
+    setIsCreatingShare(true)
+    setAdminShareUrl(null)
+    setAdminCopiedToClipboard(false)
+    try {
+      const response = await fetch('/api/attendance/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUserId: selectedUserId,
+          requestUserId: user.id,
+          companyId: user.companyId,
+          yearMonth: adminShareMonth,
+          expiresInDays: 30
+        })
+      })
+      const data = await response.json()
+      if (response.ok) {
+        const url = `${window.location.origin}/share/${data.share.token}`
+        setAdminShareUrl(url)
+        setMessage('共有リンクを作成しました')
+        loadAllCompanyShares()
+      } else {
+        setMessage(data.error || '共有リンクの作成に失敗しました')
+      }
+    } catch (error) {
+      console.error('Error creating share link:', error)
+      setMessage('共有リンクの作成に失敗しました')
+    } finally {
+      setIsCreatingShare(false)
+    }
+  }
+
+  // 管理者用：クリップボードにコピー
+  const handleCopyAdminShareUrl = async () => {
+    if (!adminShareUrl) return
+    try {
+      await navigator.clipboard.writeText(adminShareUrl)
+      setAdminCopiedToClipboard(true)
+      setTimeout(() => setAdminCopiedToClipboard(false), 2000)
+    } catch (error) {
+      console.error('Error copying to clipboard:', error)
+    }
+  }
+
+  // 管理者用：社員の共有リンクを削除
+  const handleDeleteAdminShare = async (shareId: string) => {
+    if (!user) return
+    try {
+      const response = await fetch(`/api/attendance/share?shareId=${shareId}&userId=${user.id}&companyId=${user.companyId}`, {
+        method: 'DELETE'
+      })
+      if (response.ok) {
+        setMessage('共有リンクを削除しました')
+        loadAllCompanyShares()
+      } else {
+        const data = await response.json()
+        setMessage(data.error || '削除に失敗しました')
+      }
+    } catch (error) {
+      console.error('Error deleting share:', error)
+      setMessage('削除に失敗しました')
     }
   }
 
@@ -564,6 +765,17 @@ export default function AttendancePage() {
             勤怠履歴を{showRecords ? '閉じる' : '表示'}
           </button>
 
+          <button
+            onClick={() => {
+              setShowShareModal(true)
+              loadExistingShares()
+            }}
+            className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center justify-center"
+          >
+            <Share2 className="w-5 h-5 mr-2" />
+            勤怠記録を共有
+          </button>
+
           {user.isAdmin && (
             <>
               <button
@@ -634,6 +846,19 @@ export default function AttendancePage() {
                   </p>
                 </div>
               </div>
+
+              {/* 管理者用：社員の共有リンク管理 */}
+              <button
+                onClick={() => {
+                  setShowAdminShareModal(true)
+                  loadCompanyUsers()
+                  loadAllCompanyShares()
+                }}
+                className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-indigo-700 transition flex items-center justify-center"
+              >
+                <Share2 className="w-5 h-5 mr-2" />
+                社員の共有リンク管理
+              </button>
             </>
           )}
         </div>
@@ -755,6 +980,290 @@ export default function AttendancePage() {
                 >
                   キャンセル
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 共有リンク作成モーダル */}
+        {showShareModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-lg flex items-center">
+                  <Share2 className="w-5 h-5 mr-2" />
+                  勤怠記録を共有
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowShareModal(false)
+                    setShareUrl(null)
+                    setCopiedToClipboard(false)
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <p className="text-sm text-gray-600 mb-4">
+                指定した月の勤怠記録を、パブリックなURLとして共有できます。リンクは30日間有効です。
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    共有する月
+                  </label>
+                  <input
+                    type="month"
+                    value={shareMonth}
+                    onChange={(e) => setShareMonth(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <button
+                  onClick={handleCreateShareLink}
+                  disabled={isCreatingShare}
+                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center"
+                >
+                  {isCreatingShare ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  ) : (
+                    <Share2 className="w-4 h-4 mr-2" />
+                  )}
+                  {isCreatingShare ? '作成中...' : '共有リンクを作成'}
+                </button>
+
+                {shareUrl && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p className="text-sm text-green-700 mb-2 font-semibold">共有リンクが作成されました！</p>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={shareUrl}
+                        className="flex-1 text-sm px-3 py-2 border border-gray-300 rounded-lg bg-white"
+                      />
+                      <button
+                        onClick={handleCopyShareUrl}
+                        className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                      >
+                        {copiedToClipboard ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                      <a
+                        href={shareUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    </div>
+                    {copiedToClipboard && (
+                      <p className="text-xs text-green-600 mt-1">クリップボードにコピーしました</p>
+                    )}
+                  </div>
+                )}
+
+                {/* 既存の共有リンク一覧 */}
+                <div className="border-t pt-4 mt-4">
+                  <h4 className="font-semibold text-sm text-gray-800 mb-3">既存の共有リンク</h4>
+                  {isLoadingShares ? (
+                    <div className="text-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                    </div>
+                  ) : existingShares.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-4">共有リンクはありません</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {existingShares.map((share) => (
+                        <div key={share.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div>
+                            <p className="font-semibold text-sm">{formatYearMonth(share.year_month)}</p>
+                            <p className="text-xs text-gray-500">
+                              有効期限: {new Date(share.expires_at).toLocaleDateString('ja-JP')}
+                            </p>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <a
+                              href={`${window.location.origin}/share/${share.token}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                            <button
+                              onClick={() => handleDeleteShare(share.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 管理者用：社員の共有リンク管理モーダル */}
+        {showAdminShareModal && user?.isAdmin && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-lg flex items-center">
+                  <Users className="w-5 h-5 mr-2" />
+                  社員の共有リンク管理
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowAdminShareModal(false)
+                    setAdminShareUrl(null)
+                    setAdminCopiedToClipboard(false)
+                    setSelectedUserId('')
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <p className="text-sm text-gray-600 mb-4">
+                社員を選択して勤怠記録の共有リンクを作成できます。
+              </p>
+
+              <div className="space-y-4">
+                {/* 社員選択 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    社員を選択
+                  </label>
+                  {isLoadingCompanyUsers ? (
+                    <div className="text-center py-2">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600 mx-auto"></div>
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedUserId}
+                      onChange={(e) => setSelectedUserId(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    >
+                      <option value="">社員を選択してください</option>
+                      {companyUsers.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name || u.email || 'Unknown'} {u.id === user.id ? '(自分)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {/* 月選択 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    共有する月
+                  </label>
+                  <input
+                    type="month"
+                    value={adminShareMonth}
+                    onChange={(e) => setAdminShareMonth(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+
+                <button
+                  onClick={handleCreateAdminShareLink}
+                  disabled={isCreatingShare || !selectedUserId}
+                  className="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-indigo-700 transition disabled:opacity-50 flex items-center justify-center"
+                >
+                  {isCreatingShare ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  ) : (
+                    <Share2 className="w-4 h-4 mr-2" />
+                  )}
+                  {isCreatingShare ? '作成中...' : '共有リンクを作成'}
+                </button>
+
+                {adminShareUrl && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p className="text-sm text-green-700 mb-2 font-semibold">共有リンクが作成されました！</p>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={adminShareUrl}
+                        className="flex-1 text-sm px-3 py-2 border border-gray-300 rounded-lg bg-white"
+                      />
+                      <button
+                        onClick={handleCopyAdminShareUrl}
+                        className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                      >
+                        {adminCopiedToClipboard ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                      <a
+                        href={adminShareUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    </div>
+                    {adminCopiedToClipboard && (
+                      <p className="text-xs text-green-600 mt-1">クリップボードにコピーしました</p>
+                    )}
+                  </div>
+                )}
+
+                {/* 全社員の共有リンク一覧 */}
+                <div className="border-t pt-4 mt-4">
+                  <h4 className="font-semibold text-sm text-gray-800 mb-3">全社員の共有リンク一覧</h4>
+                  {isLoadingShares ? (
+                    <div className="text-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto"></div>
+                    </div>
+                  ) : allCompanyShares.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-4">共有リンクはありません</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {allCompanyShares.map((share) => (
+                        <div key={share.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div>
+                            <p className="font-semibold text-sm">
+                              {share.users?.name || share.users?.email || 'Unknown'}
+                            </p>
+                            <p className="text-xs text-gray-600">{formatYearMonth(share.year_month)}</p>
+                            <p className="text-xs text-gray-500">
+                              有効期限: {new Date(share.expires_at).toLocaleDateString('ja-JP')}
+                            </p>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <a
+                              href={`${window.location.origin}/share/${share.token}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                            <button
+                              onClick={() => handleDeleteAdminShare(share.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
