@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Clock, Coffee, ChevronLeft, ChevronRight, Send, X, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { Calendar, Clock, Coffee, ChevronLeft, ChevronRight, Send, X, CheckCircle, XCircle, AlertCircle, Users, Edit3 } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import Link from 'next/link'
 
@@ -37,6 +37,12 @@ interface ChangeRequest {
   created_at: string
 }
 
+interface CompanyUser {
+  id: string
+  name: string | null
+  email: string | null
+}
+
 export default function HistoryPage() {
   const { isAuthenticated, userProfile, isLoading: authLoading } = useAuth()
   const [user, setUser] = useState<User | null>(null)
@@ -63,6 +69,22 @@ export default function HistoryPage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // 管理者用：社員選択
+  const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([])
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false)
+  
+  // 管理者用：直接編集モーダル
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingRecord, setEditingRecord] = useState<{
+    date: string
+    clockIn: string
+    clockOut: string
+    breakStart: string
+    breakEnd: string
+  } | null>(null)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+
   // 年の選択肢を生成（現在年から5年前まで）
   const yearOptions = Array.from({ length: 6 }, (_, i) => currentDate.getFullYear() - i)
   
@@ -79,10 +101,26 @@ export default function HistoryPage() {
 
   useEffect(() => {
     if (user) {
+      // 管理者の場合は社員一覧を読み込む
+      if (user.role === 'admin') {
+        loadCompanyUsers()
+      }
       loadRecordsForMonth()
       loadPendingRequests()
     }
-  }, [user, selectedYear, selectedMonth])
+  }, [user])
+
+  useEffect(() => {
+    if (user) {
+      loadRecordsForMonth()
+      if (!selectedUserId || selectedUserId === user.id) {
+        loadPendingRequests()
+      } else {
+        // 他の社員を見ている場合はリクエスト表示をクリア
+        setPendingRequests([])
+      }
+    }
+  }, [selectedYear, selectedMonth, selectedUserId])
 
   const loadUser = async (lineUserId: string) => {
     try {
@@ -99,8 +137,28 @@ export default function HistoryPage() {
     }
   }
 
+  const loadCompanyUsers = async () => {
+    if (!user) return
+    
+    setIsLoadingUsers(true)
+    try {
+      const response = await fetch(`/api/users?companyId=${user.companyId}&listAll=true`)
+      const data = await response.json()
+      if (data.users) {
+        setCompanyUsers(data.users)
+      }
+    } catch (error) {
+      console.error('Error loading company users:', error)
+    } finally {
+      setIsLoadingUsers(false)
+    }
+  }
+
   const loadRecordsForMonth = async () => {
     if (!user) return
+    
+    // 管理者が他の社員を選択している場合はその社員のレコードを取得
+    const targetUserId = (user.role === 'admin' && selectedUserId) ? selectedUserId : user.id
     
     try {
       const startDate = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}-01`
@@ -108,7 +166,7 @@ export default function HistoryPage() {
       const endDate = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`
       
       const response = await fetch(
-        `/api/attendance?userId=${user.id}&companyId=${user.companyId}&startDate=${startDate}&endDate=${endDate}`
+        `/api/attendance?userId=${targetUserId}&companyId=${user.companyId}&startDate=${startDate}&endDate=${endDate}`
       )
       const data = await response.json()
       setRecords(data.records || [])
@@ -280,6 +338,89 @@ export default function HistoryPage() {
     }
   }
 
+  // 管理者用：直接編集モーダルを開く
+  const openEditModal = (dateStr: string, record: AttendanceRecord | undefined) => {
+    setEditingRecord({
+      date: dateStr,
+      clockIn: record ? formatDateTimeLocal(record.clock_in) : '',
+      clockOut: record ? formatDateTimeLocal(record.clock_out) : '',
+      breakStart: record ? formatDateTimeLocal(record.break_start) : '',
+      breakEnd: record ? formatDateTimeLocal(record.break_end) : ''
+    })
+    setShowEditModal(true)
+  }
+
+  // 管理者用：直接編集を保存
+  const handleSaveEdit = async () => {
+    if (!user || !editingRecord) return
+    
+    const targetUserId = selectedUserId || user.id
+    
+    setIsSavingEdit(true)
+    try {
+      // 既存レコードがあるか確認
+      const existingRecord = records.find(r => r.date === editingRecord.date)
+      
+      if (existingRecord) {
+        // 既存レコードを更新
+        const response = await fetch(`/api/attendance/${existingRecord.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: user.id,
+            companyId: user.companyId,
+            clockIn: editingRecord.clockIn ? new Date(editingRecord.clockIn).toISOString() : null,
+            clockOut: editingRecord.clockOut ? new Date(editingRecord.clockOut).toISOString() : null,
+            breakStart: editingRecord.breakStart ? new Date(editingRecord.breakStart).toISOString() : null,
+            breakEnd: editingRecord.breakEnd ? new Date(editingRecord.breakEnd).toISOString() : null
+          })
+        })
+        
+        if (response.ok) {
+          setMessage('勤怠記録を更新しました')
+          setShowEditModal(false)
+          loadRecordsForMonth()
+        } else {
+          const data = await response.json()
+          setMessage(data.error || '更新に失敗しました')
+        }
+      } else {
+        // 新規レコードを作成
+        const response = await fetch('/api/attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: targetUserId,
+            companyId: user.companyId,
+            adminId: user.id,
+            date: editingRecord.date,
+            clockIn: editingRecord.clockIn ? new Date(editingRecord.clockIn).toISOString() : null,
+            clockOut: editingRecord.clockOut ? new Date(editingRecord.clockOut).toISOString() : null,
+            breakStart: editingRecord.breakStart ? new Date(editingRecord.breakStart).toISOString() : null,
+            breakEnd: editingRecord.breakEnd ? new Date(editingRecord.breakEnd).toISOString() : null
+          })
+        })
+        
+        if (response.ok) {
+          setMessage('勤怠記録を作成しました')
+          setShowEditModal(false)
+          loadRecordsForMonth()
+        } else {
+          const data = await response.json()
+          setMessage(data.error || '作成に失敗しました')
+        }
+      }
+    } catch (error) {
+      console.error('Error saving edit:', error)
+      setMessage('保存に失敗しました')
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
+
+  // 現在自分自身を見ているかどうか
+  const isViewingSelf = !selectedUserId || selectedUserId === user?.id
+
   const getRequestStatus = (dateStr: string) => {
     const request = pendingRequests.find(r => r.request_date === dateStr)
     if (!request) return null
@@ -335,12 +476,43 @@ export default function HistoryPage() {
               <Calendar className="w-6 h-6 text-blue-600" />
               <h1 className="text-xl font-bold text-gray-800">勤怠履歴</h1>
             </div>
-            <Link href="/attendance" className="text-blue-600 hover:text-blue-800 text-sm">
+            <Link href="/" className="text-blue-600 hover:text-blue-800 text-sm">
               ← 戻る
             </Link>
           </div>
           
           <p className="text-sm text-gray-600 mb-4">{user.company.name}</p>
+          
+          {/* 管理者用：社員選択 */}
+          {user.role === 'admin' && (
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <Users className="w-4 h-4 mr-1" />
+                社員を選択
+              </label>
+              <select
+                value={selectedUserId || user.id}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isLoadingUsers}
+              >
+                <option value={user.id}>自分（{user.name || user.email}）</option>
+                {companyUsers
+                  .filter(u => u.id !== user.id)
+                  .map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.name || u.email || '名前未設定'}
+                    </option>
+                  ))
+                }
+              </select>
+              {!isViewingSelf && (
+                <p className="text-xs text-blue-600 mt-1">
+                  他の社員の記録を閲覧・編集中
+                </p>
+              )}
+            </div>
+          )}
           
           {/* 年月選択 */}
           <div className="flex items-center justify-center space-x-4">
@@ -431,7 +603,15 @@ export default function HistoryPage() {
                         {record ? calculateWorkTime(record) : '-'}
                       </td>
                       <td className="px-3 py-2 text-center">
-                        {pendingRequest ? (
+                        {user.role === 'admin' ? (
+                          <button
+                            onClick={() => openEditModal(dateStr, record)}
+                            className="p-1 text-green-600 hover:bg-green-50 rounded transition"
+                            title="直接編集"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                        ) : pendingRequest ? (
                           <button
                             onClick={() => handleCancelRequest(pendingRequest.id)}
                             className="p-1 text-red-600 hover:bg-red-50 rounded transition"
@@ -589,6 +769,101 @@ export default function HistoryPage() {
               </button>
               <button
                 onClick={() => setShowRequestModal(false)}
+                className="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-gray-600 transition"
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 管理者用：直接編集モーダル */}
+      {showEditModal && editingRecord && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center">
+                <Edit3 className="w-5 h-5 mr-2 text-green-600" />
+                勤怠記録の編集
+              </h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              {editingRecord.date}の記録を編集
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  出勤時刻
+                </label>
+                <input
+                  type="datetime-local"
+                  value={editingRecord.clockIn}
+                  onChange={(e) => setEditingRecord({ ...editingRecord, clockIn: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  退勤時刻
+                </label>
+                <input
+                  type="datetime-local"
+                  value={editingRecord.clockOut}
+                  onChange={(e) => setEditingRecord({ ...editingRecord, clockOut: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  休憩開始
+                </label>
+                <input
+                  type="datetime-local"
+                  value={editingRecord.breakStart}
+                  onChange={(e) => setEditingRecord({ ...editingRecord, breakStart: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  休憩終了
+                </label>
+                <input
+                  type="datetime-local"
+                  value={editingRecord.breakEnd}
+                  onChange={(e) => setEditingRecord({ ...editingRecord, breakEnd: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={handleSaveEdit}
+                disabled={isSavingEdit}
+                className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-700 transition disabled:opacity-50 flex items-center justify-center"
+              >
+                {isSavingEdit ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                ) : (
+                  <Edit3 className="w-4 h-4 mr-2" />
+                )}
+                {isSavingEdit ? '保存中...' : '保存する'}
+              </button>
+              <button
+                onClick={() => setShowEditModal(false)}
                 className="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-gray-600 transition"
               >
                 キャンセル
