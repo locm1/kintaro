@@ -445,15 +445,6 @@ export default function AttendancePage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="max-w-md mx-auto">
-          {/* ヘッダーのスケルトン */}
-          <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-              <Clock className="w-8 h-8 text-gray-400" />
-            </div>
-            <div className="h-8 bg-gray-200 rounded w-32 mx-auto mb-2 animate-pulse"></div>
-            <div className="h-4 bg-gray-200 rounded w-24 mx-auto animate-pulse"></div>
-          </div>
-
           {/* プロフィールカードのスケルトン */}
           <div className="bg-white rounded-lg shadow-md p-4 mb-6">
             <div className="flex items-center space-x-3">
@@ -518,18 +509,6 @@ export default function AttendancePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-md mx-auto">
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Clock className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800">勤太郎</h1>
-          <p className="text-gray-600">{user.company.name}</p>
-          {user.isAdmin && (
-            <span className="inline-block bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full mt-1">
-              管理者
-            </span>
-          )}
-        </div>
 
         {userProfile && (
           <div className="bg-white rounded-lg shadow-md p-4 mb-6">
@@ -541,6 +520,11 @@ export default function AttendancePage() {
               />
               <div>
                 <p className="font-semibold">{userProfile.displayName}</p>
+                {user.isAdmin && (
+                  <span className="inline-block bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full mt-1">
+                    管理者
+                  </span>
+                )}
                 <p className="text-sm text-gray-600">
                   {new Date().toLocaleDateString('ja-JP', { 
                     year: 'numeric', 
