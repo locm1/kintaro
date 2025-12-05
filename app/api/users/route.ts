@@ -29,13 +29,16 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
       }
 
-      const users = userCompanies?.map(uc => ({
-        id: uc.users?.id,
-        name: uc.users?.name,
-        email: uc.users?.email,
-        lineUserId: uc.users?.line_user_id,
-        isAdmin: uc.is_admin
-      })).filter(u => u.id) || []
+      const users = userCompanies?.map(uc => {
+        const userData = uc.users as any
+        return {
+          id: userData?.id,
+          name: userData?.name,
+          email: userData?.email,
+          lineUserId: userData?.line_user_id,
+          isAdmin: uc.is_admin
+        }
+      }).filter(u => u.id) || []
 
       return NextResponse.json({ users })
     }
