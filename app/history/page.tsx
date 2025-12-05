@@ -7,6 +7,8 @@ import Link from 'next/link'
 
 interface User {
   id: string
+  name: string | null
+  email: string | null
   companyId: string
   isAdmin: boolean
   company: {
@@ -110,7 +112,7 @@ export default function HistoryPage() {
   useEffect(() => {
     if (user) {
       // 管理者の場合は社員一覧を読み込む
-      if (user.role === 'admin') {
+      if (user.isAdmin) {
         loadCompanyUsers()
       }
       loadRecordsForMonth()
@@ -166,7 +168,7 @@ export default function HistoryPage() {
     if (!user) return
     
     // 管理者が他の社員を選択している場合はその社員のレコードを取得
-    const targetUserId = (user.role === 'admin' && selectedUserId) ? selectedUserId : user.id
+    const targetUserId = (user.isAdmin && selectedUserId) ? selectedUserId : user.id
     
     try {
       const startDate = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}-01`
@@ -566,20 +568,15 @@ export default function HistoryPage() {
       <div className="max-w-4xl mx-auto">
         {/* ヘッダー */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-2">
-              <Calendar className="w-6 h-6 text-blue-600" />
-              <h1 className="text-xl font-bold text-gray-800">勤怠履歴</h1>
-            </div>
-            <Link href="/" className="text-blue-600 hover:text-blue-800 text-sm">
-              ← 戻る
-            </Link>
+          <div className="flex items-center space-x-2 mb-4">
+            <Calendar className="w-6 h-6 text-blue-600" />
+            <h1 className="text-xl font-bold text-gray-800">勤怠履歴</h1>
           </div>
           
           <p className="text-sm text-gray-600 mb-4">{user.company.name}</p>
           
           {/* 管理者用：社員選択 */}
-          {user.role === 'admin' && (
+          {user.isAdmin && (
             <div className="mb-4 p-3 bg-blue-50 rounded-lg">
               <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                 <Users className="w-4 h-4 mr-1" />
@@ -714,7 +711,7 @@ export default function HistoryPage() {
                         {record ? calculateWorkTime(record) : '-'}
                       </td>
                       <td className="px-3 py-2 text-center">
-                        {user.role === 'admin' ? (
+                        {user.isAdmin ? (
                           <button
                             onClick={() => openEditModal(dateStr, record)}
                             className="p-1 text-green-600 hover:bg-green-50 rounded transition"

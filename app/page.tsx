@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, Coffee, History, ClipboardList, Settings } from 'lucide-react'
+import { Clock, Coffee, ClipboardList } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useAuth } from '@/components/AuthProvider'
 import Link from 'next/link'
@@ -430,16 +430,8 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="space-y-3">
-          <Link
-            href="/history"
-            className="w-full bg-slate-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-slate-700 transition flex items-center justify-center"
-          >
-            <History className="w-5 h-5 mr-2" />
-            履歴・変更リクエスト
-          </Link>
-
-          {user.isAdmin && (
+        {user.isAdmin && (
+          <div className="space-y-3">
             <Link
               href="/requests"
               className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-orange-700 transition flex items-center justify-center"
@@ -447,16 +439,8 @@ export default function Home() {
               <ClipboardList className="w-5 h-5 mr-2" />
               変更リクエスト管理
             </Link>
-          )}
-
-          <Link
-            href="/settings"
-            className="w-full bg-gray-500 text-white py-3 px-4 rounded-lg font-semibold hover:bg-gray-600 transition flex items-center justify-center"
-          >
-            <Settings className="w-5 h-5 mr-2" />
-            設定
-          </Link>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )
