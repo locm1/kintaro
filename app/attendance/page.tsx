@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, Coffee, FileText, Users, Edit3, Download, Calendar, Share2, Copy, Check, ExternalLink, Trash2 } from 'lucide-react'
+import { Clock, Coffee, FileText, Users, Edit3, Download, Calendar, Share2, Copy, Check, ExternalLink, Trash2, History, ClipboardList } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useAuth } from '@/components/AuthProvider'
+import Link from 'next/link'
 
 interface User {
   id: string
@@ -765,6 +766,14 @@ export default function AttendancePage() {
             勤怠履歴を{showRecords ? '閉じる' : '表示'}
           </button>
 
+          <Link
+            href="/history"
+            className="w-full bg-slate-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-slate-700 transition flex items-center justify-center"
+          >
+            <History className="w-5 h-5 mr-2" />
+            履歴・変更リクエスト
+          </Link>
+
           <button
             onClick={() => {
               setShowShareModal(true)
@@ -859,6 +868,14 @@ export default function AttendancePage() {
                 <Share2 className="w-5 h-5 mr-2" />
                 社員の共有リンク管理
               </button>
+              
+              <Link
+                href="/requests"
+                className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-orange-700 transition flex items-center justify-center"
+              >
+                <ClipboardList className="w-5 h-5 mr-2" />
+                変更リクエスト管理
+              </Link>
             </>
           )}
         </div>
