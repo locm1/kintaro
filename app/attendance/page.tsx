@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, Coffee, FileText, Users, Edit3, Download, Calendar, Share2, Copy, Check, ExternalLink, Trash2, History, ClipboardList } from 'lucide-react'
+import { Clock, Coffee, Users, Download, Share2, Copy, Check, ExternalLink, Trash2, History, ClipboardList } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useAuth } from '@/components/AuthProvider'
 import Link from 'next/link'
@@ -38,22 +38,11 @@ export default function AttendancePage() {
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isPageLoading, setIsPageLoading] = useState(true) // ページ全体のローディング状態
-  const [isRecordsLoading, setIsRecordsLoading] = useState(false)
   const [message, setMessage] = useState('')
-  const [showAdmin, setShowAdmin] = useState(false)
-  const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null)
-  const [users, setUsers] = useState<User[]>([])
-  const [showRecords, setShowRecords] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [exportDateRange, setExportDateRange] = useState({
     startDate: '',
     endDate: ''
-  })
-  const [editForm, setEditForm] = useState({
-    clockIn: '',
-    clockOut: '',
-    breakStart: '',
-    breakEnd: ''
   })
   const [showShareModal, setShowShareModal] = useState(false)
   const [shareMonth, setShareMonth] = useState(() => {
@@ -403,52 +392,6 @@ export default function AttendancePage() {
     }
   }
 
-  const handleEditRecord = (record: AttendanceRecord) => {
-    setEditingRecord(record)
-    setEditForm({
-      clockIn: record.clock_in ? new Date(record.clock_in).toISOString().slice(0, 16) : '',
-      clockOut: record.clock_out ? new Date(record.clock_out).toISOString().slice(0, 16) : '',
-      breakStart: record.break_start ? new Date(record.break_start).toISOString().slice(0, 16) : '',
-      breakEnd: record.break_end ? new Date(record.break_end).toISOString().slice(0, 16) : ''
-    })
-  }
-
-  const handleSaveEdit = async () => {
-    if (!editingRecord || !user) return
-
-    setIsLoading(true)
-    try {
-      const response = await fetch(`/api/attendance/${editingRecord.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          adminUserId: user.id,
-          companyId: user.companyId,
-          clockIn: editForm.clockIn ? new Date(editForm.clockIn).toISOString() : null,
-          clockOut: editForm.clockOut ? new Date(editForm.clockOut).toISOString() : null,
-          breakStart: editForm.breakStart ? new Date(editForm.breakStart).toISOString() : null,
-          breakEnd: editForm.breakEnd ? new Date(editForm.breakEnd).toISOString() : null
-        }),
-      })
-
-      const data = await response.json()
-      
-      if (response.ok) {
-        setMessage(data.message)
-        setEditingRecord(null)
-        await loadRecords(user.id, user.companyId)
-      } else {
-        setMessage(data.error || 'エラーが発生しました')
-      }
-    } catch (error) {
-      setMessage('エラーが発生しました')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   const handleExportCSV = async () => {
     if (!user || !user.isAdmin) return
 
@@ -496,15 +439,6 @@ export default function AttendancePage() {
     return new Date(timeString).toLocaleTimeString('ja-JP', {
       hour: '2-digit',
       minute: '2-digit'
-    })
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ja-JP', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      weekday: 'short'
     })
   }
 
@@ -758,14 +692,6 @@ export default function AttendancePage() {
         </div>
 
         <div className="space-y-3">
-          <button
-            onClick={() => setShowRecords(!showRecords)}
-            className="w-full bg-white text-gray-700 py-3 px-4 rounded-lg font-semibold hover:bg-gray-50 transition flex items-center justify-center"
-          >
-            <FileText className="w-5 h-5 mr-2" />
-            勤怠履歴を{showRecords ? '閉じる' : '表示'}
-          </button>
-
           <Link
             href="/history"
             className="w-full bg-slate-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-slate-700 transition flex items-center justify-center"
@@ -787,17 +713,6 @@ export default function AttendancePage() {
 
           {user.isAdmin && (
             <>
-              <button
-                onClick={() => {
-                  setShowRecords(true)
-                  loadRecords(user.id, user.companyId)
-                }}
-                className="w-full bg-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-purple-700 transition flex items-center justify-center"
-              >
-                <Users className="w-5 h-5 mr-2" />
-                全社員の勤怠管理
-              </button>
-              
               <div className="bg-white rounded-lg shadow-md p-4">
                 <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
                   <Download className="w-5 h-5 mr-2" />
@@ -879,128 +794,6 @@ export default function AttendancePage() {
             </>
           )}
         </div>
-
-        {showRecords && (
-          <div className="mt-6 bg-white rounded-lg shadow-md p-4">
-            <h3 className="font-semibold text-gray-800 mb-4">勤怠履歴</h3>
-            <div className="space-y-3">
-              {attendanceRecords.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">履歴がありません</p>
-              ) : (
-                attendanceRecords.map((record) => (
-                  <div key={record.id} className="border rounded-lg p-3">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="font-semibold">{formatDate(record.date)}</p>
-                        {record.user_companies?.users && (
-                          <p className="text-sm text-gray-600">
-                            {record.user_companies.users.email.split('@')[0]}
-                          </p>
-                        )}
-                      </div>
-                      {user.isAdmin && (
-                        <button
-                          onClick={() => handleEditRecord(record)}
-                          className="text-purple-600 hover:text-purple-800"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-gray-600">出勤:</span>
-                        <span className="ml-1">{formatTime(record.clock_in)}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">退勤:</span>
-                        <span className="ml-1">{formatTime(record.clock_out)}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">休憩開始:</span>
-                        <span className="ml-1">{formatTime(record.break_start)}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">休憩終了:</span>
-                        <span className="ml-1">{formatTime(record.break_end)}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {editingRecord && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h3 className="font-semibold text-lg mb-4">勤怠記録を編集</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    出勤時刻
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={editForm.clockIn}
-                    onChange={(e) => setEditForm({...editForm, clockIn: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    退勤時刻
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={editForm.clockOut}
-                    onChange={(e) => setEditForm({...editForm, clockOut: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    休憩開始
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={editForm.breakStart}
-                    onChange={(e) => setEditForm({...editForm, breakStart: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    休憩終了
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={editForm.breakEnd}
-                    onChange={(e) => setEditForm({...editForm, breakEnd: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-              <div className="flex space-x-3 mt-6">
-                <button
-                  onClick={handleSaveEdit}
-                  disabled={isLoading}
-                  className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg font-semibold disabled:opacity-50 hover:bg-purple-700 transition"
-                >
-                  保存
-                </button>
-                <button
-                  onClick={() => setEditingRecord(null)}
-                  disabled={isLoading}
-                  className="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-gray-600 transition"
-                >
-                  キャンセル
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* 共有リンク作成モーダル */}
         {showShareModal && (
