@@ -112,19 +112,23 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
     const companyId = searchParams.get('companyId')
+    const date = searchParams.get('date')
+    const startDate = searchParams.get('startDate')
+    const endDate = searchParams.get('endDate')
 
     if (!userId || !companyId) {
       return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 })
     }
 
-    // ユーザーが管理者かチェック
-    const { data: userCompanies } = await supabaseAdmin
+    // リクエストを送信したユーザーの管理者権限をチェック
+    const { data: requestUserCompanies } = await supabaseAdmin
       .from('user_companies')
       .select('is_admin')
       .eq('user_id', userId)
       .eq('company_id', companyId)
     
-    const userCompany = userCompanies?.[0]
+    const requestUserCompany = requestUserCompanies?.[0]
+    const isAdmin = requestUserCompany?.is_admin || false
 
     let query = supabaseAdmin
       .from('attendance_records')
@@ -139,14 +143,27 @@ export async function GET(request: NextRequest) {
       `)
       .eq('company_id', companyId)
 
-    // 管理者でない場合は自分の記録のみ
-    if (!userCompany?.is_admin) {
-      query = query.eq('user_id', userId)
+    // 管理者でない場合は必ず自分の記録のみ
+    // 管理者の場合でも、userIdパラメータで指定されたユーザーのデータのみ取得
+    query = query.eq('user_id', userId)
+
+    // 日付フィルタリング
+    if (date) {
+      // 特定の日付
+      query = query.eq('date', date)
+    } else if (startDate && endDate) {
+      // 日付範囲
+      query = query.gte('date', startDate).lte('date', endDate)
+    } else {
+      // デフォルト: 過去30日間
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0]
+      query = query.gte('date', thirtyDaysAgoStr)
     }
 
     const { data: records, error } = await query
       .order('date', { ascending: false })
-      .limit(30)
 
     if (error) {
       console.error('Error fetching attendance records:', error)
