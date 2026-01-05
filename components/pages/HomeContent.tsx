@@ -172,12 +172,12 @@ export default function HomeContent() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="bg-white rounded-lg shadow-md p-6 text-center">
           <p className="text-gray-600 mb-4">会社との連携が必要です</p>
-          <button 
-            onClick={() => navigate('/link')}
-            className="bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition"
+          <a
+            href="/link"
+            className="inline-block bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition"
           >
             会社連携画面へ
-          </button>
+          </a>
         </div>
       </div>
     )
@@ -234,12 +234,12 @@ export default function HomeContent() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="bg-white rounded-lg shadow-md p-6 text-center">
           <p className="text-gray-600 mb-4">会社との連携が必要です</p>
-          <button 
-            onClick={() => navigate('/link')}
-            className="bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition"
+          <a
+            href="/link"
+            className="inline-block bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition"
           >
             会社連携画面へ
-          </button>
+          </a>
         </div>
       </div>
     )
