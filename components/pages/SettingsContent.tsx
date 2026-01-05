@@ -328,12 +328,12 @@ export default function SettingsContent() {
             <p className="text-gray-600 mb-4">
               {user ? '会社情報の確認・変更ができます' : 'まずは勤務先の会社と連携しましょう'}
             </p>
-            <button
-              onClick={() => navigate('/link')}
+            <a
+              href="/link"
               className="inline-block bg-blue-600 text-white py-2 px-6 rounded-lg font-semibold hover:bg-blue-700 transition"
             >
               {user ? '会社設定' : '会社連携を開始'}
-            </button>
+            </a>
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-6 text-center">
