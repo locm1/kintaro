@@ -50,16 +50,28 @@ export default function HomeContent() {
   const loadUserAndRecords = async (lineUserId: string) => {
     try {
       setIsPageLoading(true)
+      console.log('Loading user data for LINE ID:', lineUserId)
+      
       const userResponse = await fetch(`/api/users?lineUserId=${lineUserId}`)
       if (userResponse.ok) {
         const userData = await userResponse.json()
+        console.log('User data response:', userData)
+        
         if (userData.user) {
           setUser(userData.user)
           await loadRecords(userData.user.id, userData.user.companyId)
+        } else {
+          // ユーザーが見つからない＝会社連携していない
+          console.log('User not found or not linked to company')
+          setUser(null)
         }
+      } else {
+        console.error('Failed to fetch user:', userResponse.status)
+        setUser(null)
       }
     } catch (error) {
       console.error('Error loading user:', error)
+      setUser(null)
     } finally {
       setIsPageLoading(false)
     }

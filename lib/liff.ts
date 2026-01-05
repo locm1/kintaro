@@ -110,8 +110,8 @@ const loadAuthState = () => {
       const authTime = parseInt(timestamp)
       const currentTime = Date.now()
       
-      // 24時間以内なら有効
-      if (currentTime - authTime < 24 * 60 * 60 * 1000) {
+      // 2時間以内なら有効（24時間から短縮）
+      if (currentTime - authTime < 2 * 60 * 60 * 1000) {
         const authState = {
           profile: JSON.parse(profile),
           token: token,
@@ -340,9 +340,29 @@ export const isUserLoggedIn = (): boolean => {
     const isLiffLoggedIn = window.liff.isLoggedIn()
     console.log('LIFF login status:', isLiffLoggedIn)
     
+    // LIFFの状態とキャッシュを同期
+    const savedAuth = loadAuthState()
+    
     if (!isLiffLoggedIn) {
       // LIFFでログアウトしている場合はキャッシュもクリア
-      clearAuthState()
+      if (savedAuth) {
+        console.log('LIFF logged out but cache exists, clearing cache')
+        clearAuthState()
+      }
+      return false
+    }
+    
+    // LIFFでログイン済みだがキャッシュがない場合は再取得
+    if (isLiffLoggedIn && !savedAuth) {
+      console.log('LIFF logged in but no cache, need to refresh profile')
+      // プロファイルを非同期で取得してキャッシュ（バックグラウンドで実行）
+      window.liff.getProfile().then(profile => {
+        const accessToken = window.liff!.getAccessToken()
+        saveAuthState(profile, accessToken)
+        console.log('Profile refreshed and cached')
+      }).catch(error => {
+        console.error('Failed to refresh profile:', error)
+      })
     }
     
     return isLiffLoggedIn

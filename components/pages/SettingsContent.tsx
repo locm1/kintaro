@@ -47,20 +47,31 @@ export default function SettingsContent() {
   const loadUserAndTodayRecord = async (lineUserId: string) => {
     try {
       setIsLoading(true)
+      console.log('Loading user data for LINE ID:', lineUserId)
       
       // ユーザー情報を取得
       const userResponse = await fetch(`/api/users?lineUserId=${lineUserId}`)
       if (userResponse.ok) {
         const userData = await userResponse.json()
+        console.log('User data response:', userData)
+        
         if (userData.user) {
           setUser(userData.user)
           
           // 今日の勤怠記録を取得
           await loadTodayRecord(userData.user.id, userData.user.companyId)
+        } else {
+          // ユーザーが見つからない＝会社連携していない
+          console.log('User not found or not linked to company')
+          setUser(null)
         }
+      } else {
+        console.error('Failed to fetch user:', userResponse.status)
+        setUser(null)
       }
     } catch (error) {
       console.error('Error loading user data:', error)
+      setUser(null)
     } finally {
       setIsLoading(false)
     }
