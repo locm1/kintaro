@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { notifyChangeRequest } from '@/lib/email-notifications'
 
 // 変更リクエストを作成
 export async function POST(request: NextRequest) {
@@ -76,6 +77,11 @@ export async function POST(request: NextRequest) {
       console.error('Error creating change request:', createError)
       return NextResponse.json({ error: 'Failed to create change request' }, { status: 500 })
     }
+
+    // 管理者にメール通知を送信（非同期で実行、エラーは無視）
+    notifyChangeRequest(userId, companyId, requestDate, reason).catch(err =>
+      console.error('Failed to send change request notification:', err)
+    )
 
     return NextResponse.json({
       success: true,

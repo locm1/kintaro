@@ -107,14 +107,20 @@ export interface Database {
           id: string
           name: string | null
           email: string | null
+          email_verified: boolean
+          email_verification_token: string | null
+          email_verification_expires_at: string | null
           line_user_id: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
-          id: string
+          id?: string
           name?: string | null
           email?: string | null
+          email_verified?: boolean
+          email_verification_token?: string | null
+          email_verification_expires_at?: string | null
           line_user_id?: string | null
           created_at?: string
           updated_at?: string
@@ -123,6 +129,9 @@ export interface Database {
           id?: string
           name?: string | null
           email?: string | null
+          email_verified?: boolean
+          email_verification_token?: string | null
+          email_verification_expires_at?: string | null
           line_user_id?: string | null
           created_at?: string
           updated_at?: string

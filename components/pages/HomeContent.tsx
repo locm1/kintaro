@@ -5,11 +5,13 @@ import { Clock, Coffee, ClipboardList } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '@/components/AuthProvider'
 import { useSPA } from '@/components/SPAContext'
+import EmailVerificationModal from '@/components/EmailVerificationModal'
 
 interface User {
   id: string
   name: string
-  email: string
+  email: string | null
+  emailVerified: boolean
   lineUserId: string
   companyId: string
   isAdmin: boolean
@@ -38,6 +40,8 @@ export default function HomeContent() {
   const [isPageLoading, setIsPageLoading] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [hasShownEmailPrompt, setHasShownEmailPrompt] = useState(false)
 
   useEffect(() => {
     if (userProfile?.userId) {
@@ -46,6 +50,18 @@ export default function HomeContent() {
       setIsPageLoading(false)
     }
   }, [userProfile, authLoading])
+
+  // メール認証が完了していない場合、モーダルを表示
+  useEffect(() => {
+    if (user && !user.emailVerified && !hasShownEmailPrompt && !isPageLoading) {
+      // 少し遅延させて表示
+      const timer = setTimeout(() => {
+        setShowEmailModal(true)
+        setHasShownEmailPrompt(true)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [user, hasShownEmailPrompt, isPageLoading])
 
   const loadUserAndRecords = async (lineUserId: string) => {
     try {
@@ -379,6 +395,19 @@ export default function HomeContent() {
           </div>
         )}
       </div>
+
+      {/* メール認証モーダル */}
+      <EmailVerificationModal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        userId={user.id}
+        currentEmail={user.email}
+        emailVerified={user.emailVerified}
+        onVerified={() => {
+          setUser({ ...user, emailVerified: true })
+          setShowEmailModal(false)
+        }}
+      />
     </div>
   )
 }

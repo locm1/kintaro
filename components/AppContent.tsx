@@ -10,7 +10,7 @@ interface AppContentProps {
 }
 
 // SPA以外のパス（これらは通常のNext.jsルーティングを使用）
-const NON_SPA_PATHS = ['/link', '/share']
+const NON_SPA_PATHS = ['/link', '/share', '/verify-email']
 
 export default function AppContent({ children }: AppContentProps) {
   const pathname = usePathname()

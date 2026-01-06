@@ -88,6 +88,7 @@ export async function GET(request: NextRequest) {
         id: user.id,
         name: user.name,
         email: user.email,
+        emailVerified: user.email_verified || false,
         lineUserId: user.line_user_id,
         companyId: userCompany.company_id,
         isAdmin: userCompany.is_admin,

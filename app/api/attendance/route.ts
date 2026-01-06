@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { notifyAttendanceAction } from '@/lib/email-notifications'
 
 export async function POST(request: NextRequest) {
   try {
@@ -96,6 +97,11 @@ export async function POST(request: NextRequest) {
       console.error('Error updating attendance record:', updateError)
       return NextResponse.json({ error: 'Failed to update attendance record' }, { status: 500 })
     }
+
+    // 管理者にメール通知を送信（非同期で実行、エラーは無視）
+    notifyAttendanceAction(userId, companyId, action).catch(err => 
+      console.error('Failed to send notification:', err)
+    )
 
     return NextResponse.json({ 
       message: '記録が更新されました',

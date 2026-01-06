@@ -1,14 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Building2, Users, Clock, Copy, CheckCircle } from 'lucide-react'
+import { Building2, Users, Clock, Copy, CheckCircle, Mail, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { useSPA } from '@/components/SPAContext'
+import EmailVerificationModal from '@/components/EmailVerificationModal'
 
 interface User {
   id: string
   name: string
-  email: string
+  email: string | null
+  emailVerified: boolean
   lineUserId: string
   companyId: string
   isAdmin: boolean
@@ -37,6 +39,7 @@ export default function SettingsContent() {
   const [attendanceStatus, setAttendanceStatus] = useState<string>('未出勤')
   const [isLoading, setIsLoading] = useState(false)
   const [copiedCode, setCopiedCode] = useState(false)
+  const [showEmailModal, setShowEmailModal] = useState(false)
 
   useEffect(() => {
     if (userProfile?.userId) {
@@ -331,6 +334,51 @@ export default function SettingsContent() {
             </div>
           )}
 
+          {/* メールアドレス設定 */}
+          {user && (
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <Mail className="w-5 h-5 mr-2 text-indigo-600" />
+                メール通知設定
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <span className="text-sm text-gray-600">メールアドレス</span>
+                  {user.email ? (
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="font-medium text-gray-800">{user.email}</p>
+                      {user.emailVerified ? (
+                        <span className="inline-flex items-center text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          認証済み
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
+                          <AlertCircle className="w-3 h-3 mr-1" />
+                          未認証
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 mt-1">未設定</p>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500">
+                  {user.isAdmin 
+                    ? 'メールアドレスを設定すると、社員の勤怠情報の通知を受け取れます。'
+                    : 'メールアドレスを設定すると、勤怠に関する通知を受け取れます。'
+                  }
+                </p>
+                <button
+                  onClick={() => setShowEmailModal(true)}
+                  className="mt-2 text-indigo-600 text-sm font-medium hover:text-indigo-700 transition"
+                >
+                  {user.email ? 'メールアドレスを変更' : 'メールアドレスを登録'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="bg-white rounded-lg shadow-md p-6 text-center">
             <Building2 className="w-12 h-12 text-blue-600 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-800 mb-2">
@@ -412,6 +460,21 @@ export default function SettingsContent() {
           </div>
         </div>
       </div>
+
+      {/* メール認証モーダル */}
+      {user && (
+        <EmailVerificationModal
+          isOpen={showEmailModal}
+          onClose={() => setShowEmailModal(false)}
+          userId={user.id}
+          currentEmail={user.email}
+          emailVerified={user.emailVerified}
+          onVerified={() => {
+            setUser({ ...user, emailVerified: true })
+            setShowEmailModal(false)
+          }}
+        />
+      )}
     </div>
   )
 }
