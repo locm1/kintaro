@@ -47,12 +47,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       window.liffDebugLogger = addDebugLog
       
       const pathname = window.location.pathname
-      // APIパスの場合は認証処理を実行しない
-      if (pathname.startsWith('/api/')) {
-        addDebugLog('API path detected, skipping auth initialization')
+      // APIパスまたはメール認証ページの場合は認証処理を実行しない
+      if (pathname.startsWith('/api/') || pathname.startsWith('/verify-email')) {
+        addDebugLog(`Auth-skip path detected (${pathname}), skipping auth initialization`)
         setIsLoading(false)
         setIsInitializing(false)
-        setIsAuthenticated(true) // APIでは認証不要
+        setIsAuthenticated(true) // 認証不要ページでは認証済みとして扱う
         return
       }
     }

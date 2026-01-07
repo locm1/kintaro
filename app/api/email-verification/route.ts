@@ -48,11 +48,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'ユーザー情報の更新に失敗しました' }, { status: 500 })
     }
 
-    // 認証URLを生成（LINE Mini App内で開く）
-    const miniAppUrl = process.env.NEXT_PUBLIC_MINI_APP_URL || ''
-    // pathパラメータ内にtokenを含める（Mini Appはpathの内容をそのままリダイレクト先として使用）
-    const pathWithToken = encodeURIComponent(`/verify-email?token=${verificationToken}`)
-    const verificationUrl = `${miniAppUrl}?path=${pathWithToken}`
+    // 認証URLを生成（Webアプリの直接URLを使用 - Mini Appを経由しない）
+    // 本番環境ではNEXT_PUBLIC_APP_URLを設定するか、NetlifyのURLを使用
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                   process.env.URL || // Netlifyが自動設定
+                   (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : '')
+    const verificationUrl = `${appUrl}/verify-email?token=${verificationToken}`
 
     // TODO: 実際のメール送信を実装
     // 現在はコンソールに出力（本番環境ではSendGrid、AWS SES、Resendなどを使用）
