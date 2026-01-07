@@ -98,10 +98,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to update attendance record' }, { status: 500 })
     }
 
-    // 管理者にメール通知を送信（非同期で実行、エラーは無視）
-    notifyAttendanceAction(userId, companyId, action).catch(err => 
+    // 管理者にメール通知を送信（レスポンス前に完了させる）
+    try {
+      await notifyAttendanceAction(userId, companyId, action)
+    } catch (err) {
       console.error('Failed to send notification:', err)
-    )
+      // 通知失敗しても勤怠記録は成功しているので続行
+    }
 
     return NextResponse.json({ 
       message: '記録が更新されました',

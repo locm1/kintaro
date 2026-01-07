@@ -78,10 +78,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create change request' }, { status: 500 })
     }
 
-    // 管理者にメール通知を送信（非同期で実行、エラーは無視）
-    notifyChangeRequest(userId, companyId, requestDate, reason).catch(err =>
+    // 管理者にメール通知を送信（レスポンス前に完了させる）
+    try {
+      await notifyChangeRequest(userId, companyId, requestDate, reason)
+    } catch (err) {
       console.error('Failed to send change request notification:', err)
-    )
+      // 通知失敗しても変更リクエストは成功しているので続行
+    }
 
     return NextResponse.json({
       success: true,
