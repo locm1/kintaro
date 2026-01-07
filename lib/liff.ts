@@ -173,8 +173,18 @@ const createLiffWrapper = () => {
         
         if (hasLiffCode) {
           debugLog('🔄 LIFF redirect detected, cleaning up URL...')
-          // URLパラメータをクリーンアップ
-          window.history.replaceState({}, document.title, window.location.pathname)
+          // LIFFのコード関連パラメータのみ削除し、他のパラメータ（tokenなど）は保持
+          const paramsToRemove = ['code', 'liffClientId', 'liffRedirectUri', 'state']
+          paramsToRemove.forEach(param => urlParams.delete(param))
+          
+          // 残りのパラメータがあれば保持
+          const remainingParams = urlParams.toString()
+          const newUrl = remainingParams 
+            ? `${window.location.pathname}?${remainingParams}`
+            : window.location.pathname
+          
+          debugLog(`🔗 New URL after cleanup: ${newUrl}`)
+          window.history.replaceState({}, document.title, newUrl)
           
           // 少し待ってからログイン状態をチェック（LIFFのトークン交換完了を待つ）
           debugLog('⏳ Waiting 1 second for token exchange...')
